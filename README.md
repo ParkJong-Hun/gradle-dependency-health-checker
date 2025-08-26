@@ -14,7 +14,7 @@ A powerful tool to detect duplicate dependencies, version conflicts, and recomme
 
 ### Build from Source
 ```bash
-git clone <repository-url>
+git clone https://github.com/ParkJong-Hun/gradle-dependency-health-checker.git
 cd gradle-dependency-health-checker
 cargo build --release
 ```
