@@ -1,3 +1,4 @@
+use crate::config::BundleNamePatterns;
 use crate::parser::{DependencyLocation, DependencySourceType};
 use crate::bundle_analyzer::{DependencyBundle, BundleAnalysis};
 use colored::*;
@@ -121,37 +122,31 @@ fn print_bundle_recommendation(bundle: &DependencyBundle, rank: usize) {
     }
     
     // Show recommendation
-    let bundle_name = generate_bundle_name(&bundle.dependencies);
+    let bundle_name_patterns = BundleNamePatterns::default();
+    let bundle_name = generate_bundle_name(&bundle.dependencies, &bundle_name_patterns);
     println!("   {} Consider creating a shared module: {}", 
         "💭".bright_blue(), 
         bundle_name.bright_green()
     );
 }
 
-fn generate_bundle_name(dependencies: &[String]) -> String {
-    // Extract common patterns to suggest meaningful names
-    let common_groups: std::collections::HashMap<String, usize> = dependencies
+fn generate_bundle_name(dependencies: &[String], patterns: &BundleNamePatterns) -> String {
+    let most_common_group = find_most_common_group(dependencies);
+    patterns.find_bundle_name(&most_common_group)
+}
+
+fn find_most_common_group(dependencies: &[String]) -> String {
+    let common_groups: HashMap<String, usize> = dependencies
         .iter()
         .map(|dep| dep.split(':').next().unwrap_or("unknown").to_string())
-        .fold(std::collections::HashMap::new(), |mut acc, group| {
+        .fold(HashMap::new(), |mut acc, group| {
             *acc.entry(group).or_insert(0) += 1;
             acc
         });
     
-    // Find the most common group
-    let most_common_group = common_groups
+    common_groups
         .iter()
         .max_by_key(|(_, count)| *count)
-        .map(|(group, _)| group.as_str())
-        .unwrap_or("common");
-    
-    // Generate meaningful name based on patterns
-    match most_common_group {
-        group if group.contains("androidx") => "androidx-bundle".to_string(),
-        group if group.contains("kotlin") || group.contains("jetbrains") => "kotlin-bundle".to_string(),
-        group if group.contains("test") || group.contains("junit") => "testing-bundle".to_string(),
-        group if group.contains("retrofit") || group.contains("okhttp") => "networking-bundle".to_string(),
-        group if group.contains("jackson") || group.contains("gson") => "json-bundle".to_string(),
-        _ => format!("{}-bundle", most_common_group.split('.').last().unwrap_or("common"))
-    }
+        .map(|(group, _)| group.clone())
+        .unwrap_or_else(|| "common".to_string())
 }

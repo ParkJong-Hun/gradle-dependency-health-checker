@@ -1,3 +1,5 @@
+use crate::config::{file_patterns, regex_patterns};
+use crate::error::{Result};
 use crate::version_catalog::{find_version_catalog_files, parse_version_catalog, VersionCatalog};
 use regex::Regex;
 use std::collections::HashMap;
@@ -27,7 +29,23 @@ pub enum DependencySourceType {
     VersionCatalog(String), // The libs.xxx reference
 }
 
-pub fn find_gradle_files(root_path: &Path) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> {
+struct DependencyPatterns {
+    string_dep: Regex,
+    map_dep_group_first: Regex,
+    map_dep_name_first: Regex,
+    libs_dep: Regex,
+}
+
+fn create_dependency_patterns() -> Result<DependencyPatterns> {
+    Ok(DependencyPatterns {
+        string_dep: Regex::new(regex_patterns::STRING_DEPENDENCY)?,
+        map_dep_group_first: Regex::new(regex_patterns::MAP_DEPENDENCY_1)?,
+        map_dep_name_first: Regex::new(regex_patterns::MAP_DEPENDENCY_2)?,
+        libs_dep: Regex::new(regex_patterns::LIBS_DEPENDENCY)?,
+    })
+}
+
+pub fn find_gradle_files(root_path: &Path) -> Result<Vec<PathBuf>> {
     let mut gradle_files = Vec::new();
     
     for entry in WalkDir::new(root_path) {
@@ -36,7 +54,7 @@ pub fn find_gradle_files(root_path: &Path) -> Result<Vec<PathBuf>, Box<dyn std::
         
         if path.is_file() {
             if let Some(filename) = path.file_name().and_then(|n| n.to_str()) {
-                if filename == "build.gradle" || filename == "build.gradle.kts" {
+                if file_patterns::GRADLE_BUILD_FILES.contains(&filename) {
                     gradle_files.push(path.to_path_buf());
                 }
             }
@@ -46,7 +64,7 @@ pub fn find_gradle_files(root_path: &Path) -> Result<Vec<PathBuf>, Box<dyn std::
     Ok(gradle_files)
 }
 
-pub fn load_version_catalogs(root_path: &Path) -> Result<HashMap<PathBuf, VersionCatalog>, Box<dyn std::error::Error>> {
+pub fn load_version_catalogs(root_path: &Path) -> Result<HashMap<PathBuf, VersionCatalog>> {
     let catalog_files = find_version_catalog_files(root_path)?;
     let mut catalogs = HashMap::new();
     
@@ -61,23 +79,19 @@ pub fn load_version_catalogs(root_path: &Path) -> Result<HashMap<PathBuf, Versio
 pub fn parse_dependencies_from_file(
     file_path: &Path, 
     version_catalogs: &HashMap<PathBuf, VersionCatalog>
-) -> Result<Vec<DependencyLocation>, Box<dyn std::error::Error>> {
+) -> Result<Vec<DependencyLocation>> {
     let content = fs::read_to_string(file_path)?;
     let mut dependencies = Vec::new();
     let mut in_dependencies_block = false;
     let mut brace_count = 0;
     
-    // Regex patterns for different dependency formats
-    let string_dep_regex = Regex::new(r#"^\s*(\w+)\s*[\(\s]?\s*["']([^"':]+):([^"':]+):([^"']+)["']\s*[\)\s]?.*$"#)?;
-    let map_dep_regex = Regex::new(r#"^\s*(\w+)\s*\(\s*group\s*:\s*["']([^"']+)["']\s*,\s*name\s*:\s*["']([^"']+)["']\s*,\s*version\s*:\s*["']([^"']+)["']\s*\).*$"#)?;
-    let map_dep_regex2 = Regex::new(r#"^\s*(\w+)\s*\(\s*name\s*:\s*["']([^"']+)["']\s*,\s*group\s*:\s*["']([^"']+)["']\s*,\s*version\s*:\s*["']([^"']+)["']\s*\).*$"#)?;
-    let libs_dep_regex = Regex::new(r#"^\s*(\w+)\s+libs\.([a-zA-Z0-9.\-_]+)\s*.*$"#)?;
+    let patterns = create_dependency_patterns()?;
     
     for (line_number, line) in content.lines().enumerate() {
         let trimmed_line = line.trim();
         
         // Check if we're entering a dependencies block
-        if trimmed_line.starts_with("dependencies") && trimmed_line.contains('{') {
+        if trimmed_line.starts_with(regex_patterns::DEPENDENCIES_BLOCK) && trimmed_line.contains('{') {
             in_dependencies_block = true;
             brace_count = 1;
             continue;
@@ -94,65 +108,143 @@ pub fn parse_dependencies_from_file(
             }
             
             // Parse different dependency formats
-            if let Some(captures) = string_dep_regex.captures(trimmed_line) {
-                let configuration = captures[1].to_string();
-                let group = captures[2].to_string();
-                let artifact = captures[3].to_string();
-                let version = Some(captures[4].to_string());
-                
-                dependencies.push(DependencyLocation {
-                    dependency: Dependency { group, artifact, version },
-                    file_path: file_path.to_path_buf(),
-                    line_number: line_number + 1,
-                    configuration,
-                    source_type: DependencySourceType::Direct,
-                });
-            } else if let Some(captures) = map_dep_regex.captures(trimmed_line) {
-                let configuration = captures[1].to_string();
-                let group = captures[2].to_string();
-                let artifact = captures[3].to_string();
-                let version = Some(captures[4].to_string());
-                
-                dependencies.push(DependencyLocation {
-                    dependency: Dependency { group, artifact, version },
-                    file_path: file_path.to_path_buf(),
-                    line_number: line_number + 1,
-                    configuration,
-                    source_type: DependencySourceType::Direct,
-                });
-            } else if let Some(captures) = map_dep_regex2.captures(trimmed_line) {
-                let configuration = captures[1].to_string();
-                let artifact = captures[2].to_string();
-                let group = captures[3].to_string();
-                let version = Some(captures[4].to_string());
-                
-                dependencies.push(DependencyLocation {
-                    dependency: Dependency { group, artifact, version },
-                    file_path: file_path.to_path_buf(),
-                    line_number: line_number + 1,
-                    configuration,
-                    source_type: DependencySourceType::Direct,
-                });
-            } else if let Some(captures) = libs_dep_regex.captures(trimmed_line) {
-                let configuration = captures[1].to_string();
-                let lib_reference = captures[2].to_string();
-                
-                // Try to resolve from version catalogs
-                for catalog in version_catalogs.values() {
-                    if let Some((group, artifact, version)) = catalog.resolve_library_version(&lib_reference) {
-                        dependencies.push(DependencyLocation {
-                            dependency: Dependency { group, artifact, version: Some(version) },
-                            file_path: file_path.to_path_buf(),
-                            line_number: line_number + 1,
-                            configuration,
-                            source_type: DependencySourceType::VersionCatalog(lib_reference.clone()),
-                        });
-                        break; // Use the first catalog that resolves this dependency
-                    }
-                }
+            if let Some(dep) = parse_string_dependency(&patterns.string_dep, trimmed_line, file_path, line_number + 1)? {
+                dependencies.push(dep);
+            } else if let Some(dep) = parse_map_dependency_group_first(&patterns.map_dep_group_first, trimmed_line, file_path, line_number + 1)? {
+                dependencies.push(dep);
+            } else if let Some(dep) = parse_map_dependency_name_first(&patterns.map_dep_name_first, trimmed_line, file_path, line_number + 1)? {
+                dependencies.push(dep);
+            } else if let Some(dep) = parse_libs_dependency(&patterns.libs_dep, trimmed_line, file_path, line_number + 1, version_catalogs)? {
+                dependencies.push(dep);
             }
         }
     }
     
     Ok(dependencies)
+}
+
+fn create_dependency_location(
+    group: String,
+    artifact: String,
+    version: Option<String>,
+    configuration: String,
+    file_path: &Path,
+    line_number: usize,
+    source_type: DependencySourceType,
+) -> DependencyLocation {
+    DependencyLocation {
+        dependency: Dependency { group, artifact, version },
+        file_path: file_path.to_path_buf(),
+        line_number,
+        configuration,
+        source_type,
+    }
+}
+
+fn parse_string_dependency(
+    regex: &Regex,
+    line: &str,
+    file_path: &Path,
+    line_number: usize,
+) -> Result<Option<DependencyLocation>> {
+    if let Some(captures) = regex.captures(line) {
+        let configuration = captures[1].to_string();
+        let group = captures[2].to_string();
+        let artifact = captures[3].to_string();
+        let version = Some(captures[4].to_string());
+        
+        Ok(Some(create_dependency_location(
+            group,
+            artifact,
+            version,
+            configuration,
+            file_path,
+            line_number,
+            DependencySourceType::Direct,
+        )))
+    } else {
+        Ok(None)
+    }
+}
+
+fn parse_map_dependency_group_first(
+    regex: &Regex,
+    line: &str,
+    file_path: &Path,
+    line_number: usize,
+) -> Result<Option<DependencyLocation>> {
+    if let Some(captures) = regex.captures(line) {
+        let configuration = captures[1].to_string();
+        let group = captures[2].to_string();
+        let artifact = captures[3].to_string();
+        let version = Some(captures[4].to_string());
+        
+        Ok(Some(create_dependency_location(
+            group,
+            artifact,
+            version,
+            configuration,
+            file_path,
+            line_number,
+            DependencySourceType::Direct,
+        )))
+    } else {
+        Ok(None)
+    }
+}
+
+fn parse_map_dependency_name_first(
+    regex: &Regex,
+    line: &str,
+    file_path: &Path,
+    line_number: usize,
+) -> Result<Option<DependencyLocation>> {
+    if let Some(captures) = regex.captures(line) {
+        let configuration = captures[1].to_string();
+        let artifact = captures[2].to_string();
+        let group = captures[3].to_string();
+        let version = Some(captures[4].to_string());
+        
+        Ok(Some(create_dependency_location(
+            group,
+            artifact,
+            version,
+            configuration,
+            file_path,
+            line_number,
+            DependencySourceType::Direct,
+        )))
+    } else {
+        Ok(None)
+    }
+}
+
+fn parse_libs_dependency(
+    regex: &Regex,
+    line: &str,
+    file_path: &Path,
+    line_number: usize,
+    version_catalogs: &HashMap<PathBuf, VersionCatalog>,
+) -> Result<Option<DependencyLocation>> {
+    if let Some(captures) = regex.captures(line) {
+        let configuration = captures[1].to_string();
+        let lib_reference = captures[2].to_string();
+        
+        // Try to resolve from version catalogs
+        for catalog in version_catalogs.values() {
+            if let Some((group, artifact, version)) = catalog.resolve_library_version(&lib_reference) {
+                return Ok(Some(create_dependency_location(
+                    group,
+                    artifact,
+                    Some(version),
+                    configuration,
+                    file_path,
+                    line_number,
+                    DependencySourceType::VersionCatalog(lib_reference),
+                )));
+            }
+        }
+    }
+    
+    Ok(None)
 }

@@ -1,3 +1,5 @@
+use crate::config::file_patterns;
+use crate::error::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -33,7 +35,7 @@ pub struct PluginDefinition {
     pub version: Option<String>,
 }
 
-pub fn find_version_catalog_files(root_path: &Path) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> {
+pub fn find_version_catalog_files(root_path: &Path) -> Result<Vec<PathBuf>> {
     let mut catalog_files = Vec::new();
     
     for entry in WalkDir::new(root_path) {
@@ -42,7 +44,7 @@ pub fn find_version_catalog_files(root_path: &Path) -> Result<Vec<PathBuf>, Box<
         
         if path.is_file() {
             if let Some(filename) = path.file_name().and_then(|n| n.to_str()) {
-                if filename == "libs.versions.toml" || filename == "versions.toml" {
+                if file_patterns::VERSION_CATALOG_FILES.contains(&filename) {
                     catalog_files.push(path.to_path_buf());
                 }
             }
@@ -52,7 +54,7 @@ pub fn find_version_catalog_files(root_path: &Path) -> Result<Vec<PathBuf>, Box<
     Ok(catalog_files)
 }
 
-pub fn parse_version_catalog(file_path: &Path) -> Result<VersionCatalog, Box<dyn std::error::Error>> {
+pub fn parse_version_catalog(file_path: &Path) -> Result<VersionCatalog> {
     let content = fs::read_to_string(file_path)?;
     let catalog: VersionCatalog = toml::from_str(&content)?;
     Ok(catalog)
@@ -81,19 +83,5 @@ impl VersionCatalog {
         };
         
         Some((group, name, version))
-    }
-    
-    pub fn get_all_libraries(&self) -> Vec<(String, String, String, String)> {
-        let mut result = Vec::new();
-        
-        if let Some(libraries) = &self.libraries {
-            for (lib_name, _) in libraries {
-                if let Some((group, name, version)) = self.resolve_library_version(lib_name) {
-                    result.push((lib_name.clone(), group, name, version));
-                }
-            }
-        }
-        
-        result
     }
 }

@@ -1,3 +1,4 @@
+use crate::config::Config;
 use crate::parser::DependencyLocation;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
@@ -22,6 +23,16 @@ pub fn find_dependency_bundles(
     dependencies: &[DependencyLocation],
     min_bundle_size: usize,
     min_module_count: usize,
+) -> BundleAnalysis {
+    let config = Config::default();
+    find_dependency_bundles_with_config(dependencies, min_bundle_size, min_module_count, &config)
+}
+
+pub fn find_dependency_bundles_with_config(
+    dependencies: &[DependencyLocation],
+    min_bundle_size: usize,
+    min_module_count: usize,
+    config: &Config,
 ) -> BundleAnalysis {
     // Group dependencies by module (file)
     let mut module_dependencies: HashMap<PathBuf, Vec<&DependencyLocation>> = HashMap::new();
@@ -92,7 +103,7 @@ pub fn find_dependency_bundles(
         .into_iter()
         .map(|(deps, modules)| {
             let configurations = get_configurations_for_bundle(&deps, dependencies);
-            let priority_score = calculate_priority_score(&deps, &modules, &configurations);
+            let priority_score = calculate_priority_score(&deps, &modules, &configurations, config);
             
             DependencyBundle {
                 bundle_size: deps.len(),
@@ -155,20 +166,21 @@ fn calculate_priority_score(
     dependencies: &[String],
     modules: &[PathBuf],
     configurations: &HashSet<String>,
+    config: &Config,
 ) -> f64 {
-    let bundle_size_score = dependencies.len() as f64 * 10.0; // Higher weight for bundle size
-    let module_count_score = modules.len() as f64 * 5.0;      // Medium weight for module count
+    let bundle_size_score = dependencies.len() as f64 * config.priority_weights.bundle_size;
+    let module_count_score = modules.len() as f64 * config.priority_weights.module_count;
     
-    // Configuration type score (implementation/api higher than test)
-    let config_score = configurations.iter().map(|config| {
-        match config.as_str() {
-            "api" => 3.0,
-            "implementation" => 2.5,
-            "compileOnly" => 2.0,
-            "runtimeOnly" => 1.5,
-            "testImplementation" => 1.0,
-            "testCompileOnly" => 0.5,
-            _ => 1.0,
+    // Configuration type score using config values
+    let config_score = configurations.iter().map(|config_name| {
+        match config_name.as_str() {
+            "api" => config.configuration_scores.api,
+            "implementation" => config.configuration_scores.implementation,
+            "compileOnly" => config.configuration_scores.compile_only,
+            "runtimeOnly" => config.configuration_scores.runtime_only,
+            "testImplementation" => config.configuration_scores.test_implementation,
+            "testCompileOnly" => config.configuration_scores.test_compile_only,
+            _ => config.configuration_scores.default,
         }
     }).sum::<f64>();
     

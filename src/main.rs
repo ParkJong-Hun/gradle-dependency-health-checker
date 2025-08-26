@@ -4,30 +4,35 @@ mod analyzer;
 mod display;
 mod version_catalog;
 mod bundle_analyzer;
+mod config;
+mod error;
 
 use clap::Parser;
 use colored::*;
 use cli::{Args, validate_args};
+use config::Config;
 use analyzer::perform_complete_analysis;
 use display::{print_version_conflicts, print_regular_duplicates, print_bundle_recommendations};
 
 fn main() {
     let args = Args::parse();
+    let config = Config::default();
+    let args = args.with_defaults(&config);
     
     // Validate threshold arguments
-    if let Err(error_message) = validate_args(&args) {
-        eprintln!("❌ Error: {}", error_message);
+    if let Err(error) = validate_args(&args, &config) {
+        eprintln!("❌ Error: {}", error);
         std::process::exit(1);
     }
     
-    match perform_complete_analysis(&args.path, args.min_bundle_size, args.min_bundle_modules) {
+    match perform_complete_analysis(&args.path, args.min_bundle_size(), args.min_bundle_modules()) {
         Ok(analysis) => {
             let version_conflicts_count = analysis.duplicate_analysis.version_conflicts.len();
             let duplicate_dependencies_count = analysis.duplicate_analysis.regular_duplicates.len();
             let bundle_recommendations_count = analysis.bundle_analysis.recommended_bundles.len();
             
-            let show_version_conflicts = version_conflicts_count >= args.min_version_conflicts;
-            let show_duplicate_dependencies = duplicate_dependencies_count >= args.min_duplicate_dependencies;
+            let show_version_conflicts = version_conflicts_count >= args.min_version_conflicts();
+            let show_duplicate_dependencies = duplicate_dependencies_count >= args.min_duplicate_dependencies();
             let show_bundle_recommendations = bundle_recommendations_count > 0;
             
             if !show_version_conflicts && !show_duplicate_dependencies && !show_bundle_recommendations {
@@ -55,7 +60,7 @@ fn main() {
                 }
                 
                 if show_bundle_recommendations {
-                    print_bundle_recommendations(&analysis.bundle_analysis, args.max_bundle_recommendations);
+                    print_bundle_recommendations(&analysis.bundle_analysis, args.max_bundle_recommendations());
                 }
             }
         }
