@@ -1,3 +1,10 @@
+/*
+ * Copyright (c) 2025 ParkJong-Hun
+ *
+ * Licensed under the MIT License.
+ * See LICENSE file in the project root for full license information.
+ */
+
 use crate::error::{Result};
 use crate::parser::{DependencyLocation, find_gradle_files, parse_dependencies_from_file, load_version_catalogs};
 use crate::bundle_analyzer::{find_dependency_bundles, BundleAnalysis};

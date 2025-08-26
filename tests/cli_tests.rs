@@ -1,3 +1,10 @@
+/*
+ * Copyright (c) 2025 ParkJong-Hun
+ *
+ * Licensed under the MIT License.
+ * See LICENSE file in the project root for full license information.
+ */
+
 use gradle_dependency_health_checker::cli::{Args, validate_args};
 use clap::Parser;
 

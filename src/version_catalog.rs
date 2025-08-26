@@ -1,3 +1,10 @@
+/*
+ * Copyright (c) 2025 ParkJong-Hun
+ *
+ * Licensed under the MIT License.
+ * See LICENSE file in the project root for full license information.
+ */
+
 use crate::config::file_patterns;
 use crate::error::Result;
 use serde::{Deserialize, Serialize};

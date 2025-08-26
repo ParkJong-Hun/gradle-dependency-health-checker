@@ -1,3 +1,10 @@
+/*
+ * Copyright (c) 2025 ParkJong-Hun
+ *
+ * Licensed under the MIT License.
+ * See LICENSE file in the project root for full license information.
+ */
+
 use crate::config::{file_patterns, regex_patterns};
 use crate::error::{Result};
 use crate::version_catalog::{find_version_catalog_files, parse_version_catalog, VersionCatalog};

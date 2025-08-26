@@ -1,3 +1,10 @@
+/*
+ * Copyright (c) 2025 ParkJong-Hun
+ *
+ * Licensed under the MIT License.
+ * See LICENSE file in the project root for full license information.
+ */
+
 use crate::config::BundleNamePatterns;
 use crate::parser::{DependencyLocation, DependencySourceType};
 use crate::bundle_analyzer::{DependencyBundle, BundleAnalysis};
