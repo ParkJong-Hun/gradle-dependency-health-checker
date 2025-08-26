@@ -1,4 +1,4 @@
-use crate::parser::DependencyLocation;
+use crate::parser::{DependencyLocation, DependencySourceType};
 use colored::*;
 use std::collections::HashMap;
 
@@ -11,12 +11,18 @@ pub fn print_regular_duplicates(duplicates: &HashMap<String, Vec<DependencyLocat
                 .as_ref()
                 .map(|v| format!(" (version: {})", v.bold()))
                 .unwrap_or_default();
+            
+            let source_str = match &location.source_type {
+                DependencySourceType::Direct => "",
+                DependencySourceType::VersionCatalog(ref_name) => &format!(" [via libs.{}]", ref_name),
+            };
                 
-            println!("  📍 {}:{} - {} configuration{}",
+            println!("  📍 {}:{} - {} configuration{}{}",
                 location.file_path.display(),
                 location.line_number,
                 location.configuration,
-                version_str
+                version_str,
+                source_str.dimmed()
             );
         }
     }
@@ -31,13 +37,19 @@ pub fn print_version_conflicts(conflicts: &HashMap<String, Vec<DependencyLocatio
                 .as_ref()
                 .map(|v| format!(" (version: {})", v.red().bold()).to_string())
                 .unwrap_or_default();
+            
+            let source_str = match &location.source_type {
+                DependencySourceType::Direct => "",
+                DependencySourceType::VersionCatalog(ref_name) => &format!(" [via libs.{}]", ref_name),
+            };
                 
-            println!("  {} {}:{} - {} configuration{}",
+            println!("  {} {}:{} - {} configuration{}{}",
                 "⚠️".red(),
                 location.file_path.display(),
                 location.line_number,
                 location.configuration,
-                version_str
+                version_str,
+                source_str.dimmed()
             );
         }
     }

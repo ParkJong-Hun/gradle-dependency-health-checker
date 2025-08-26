@@ -1,0 +1,99 @@
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::fs;
+use std::path::{Path, PathBuf};
+use walkdir::WalkDir;
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct VersionCatalog {
+    pub versions: Option<HashMap<String, String>>,
+    pub libraries: Option<HashMap<String, LibraryDefinition>>,
+    pub plugins: Option<HashMap<String, PluginDefinition>>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct LibraryDefinition {
+    pub group: Option<String>,
+    pub name: Option<String>,
+    pub version: Option<VersionRef>,
+    #[serde(rename = "version.ref")]
+    pub version_ref: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum VersionRef {
+    Direct(String),
+    Reference { r#ref: String },
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct PluginDefinition {
+    pub id: String,
+    pub version: Option<String>,
+}
+
+pub fn find_version_catalog_files(root_path: &Path) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> {
+    let mut catalog_files = Vec::new();
+    
+    for entry in WalkDir::new(root_path) {
+        let entry = entry?;
+        let path = entry.path();
+        
+        if path.is_file() {
+            if let Some(filename) = path.file_name().and_then(|n| n.to_str()) {
+                if filename == "libs.versions.toml" || filename == "versions.toml" {
+                    catalog_files.push(path.to_path_buf());
+                }
+            }
+        }
+    }
+    
+    Ok(catalog_files)
+}
+
+pub fn parse_version_catalog(file_path: &Path) -> Result<VersionCatalog, Box<dyn std::error::Error>> {
+    let content = fs::read_to_string(file_path)?;
+    let catalog: VersionCatalog = toml::from_str(&content)?;
+    Ok(catalog)
+}
+
+impl VersionCatalog {
+    pub fn resolve_library_version(&self, library_name: &str) -> Option<(String, String, String)> {
+        let libraries = self.libraries.as_ref()?;
+        let library_def = libraries.get(library_name)?;
+        
+        let group = library_def.group.as_ref()?.clone();
+        let name = library_def.name.as_ref()?.clone();
+        
+        // Try to get version from version_ref first, then from version field
+        let version = if let Some(version_ref) = &library_def.version_ref {
+            self.versions.as_ref()?.get(version_ref)?.clone()
+        } else if let Some(version) = &library_def.version {
+            match version {
+                VersionRef::Direct(v) => v.clone(),
+                VersionRef::Reference { r#ref } => {
+                    self.versions.as_ref()?.get(r#ref)?.clone()
+                }
+            }
+        } else {
+            return None;
+        };
+        
+        Some((group, name, version))
+    }
+    
+    pub fn get_all_libraries(&self) -> Vec<(String, String, String, String)> {
+        let mut result = Vec::new();
+        
+        if let Some(libraries) = &self.libraries {
+            for (lib_name, _) in libraries {
+                if let Some((group, name, version)) = self.resolve_library_version(lib_name) {
+                    result.push((lib_name.clone(), group, name, version));
+                }
+            }
+        }
+        
+        result
+    }
+}

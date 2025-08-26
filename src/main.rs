@@ -2,6 +2,7 @@ mod cli;
 mod parser;
 mod analyzer;
 mod display;
+mod version_catalog;
 
 use clap::Parser;
 use colored::*;

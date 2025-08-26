@@ -1,4 +1,4 @@
-use crate::parser::{DependencyLocation, find_gradle_files, parse_dependencies_from_file};
+use crate::parser::{DependencyLocation, find_gradle_files, parse_dependencies_from_file, load_version_catalogs};
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
@@ -10,10 +10,11 @@ pub struct DuplicateAnalysis {
 
 pub fn find_duplicate_dependencies(root_path: &Path) -> Result<DuplicateAnalysis, Box<dyn std::error::Error>> {
     let gradle_files = find_gradle_files(root_path)?;
+    let version_catalogs = load_version_catalogs(root_path)?;
     let mut all_dependencies = Vec::new();
     
     for gradle_file in gradle_files {
-        let mut deps = parse_dependencies_from_file(&gradle_file)?;
+        let mut deps = parse_dependencies_from_file(&gradle_file, &version_catalogs)?;
         all_dependencies.append(&mut deps);
     }
     
