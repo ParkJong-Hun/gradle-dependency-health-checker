@@ -1,7 +1,15 @@
 [package]
 name = "gradle-dependency-health-checker"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
+authors = ["ParkJong-Hun thesn515@gmail.com"]
+description = "A powerful tool to detect duplicate dependencies, version conflicts, and recommend dependency bundles in Gradle projects"
+readme = "README.md"
+homepage = "https://github.com/ParkJong-Hun/gradle-dependency-health-checker"
+repository = "https://github.com/ParkJong-Hun/gradle-dependency-health-checker"
+license = "MIT"
+keywords = ["gradle", "dependency", "build-tools", "analysis", "bundling"]
+categories = ["development-tools", "command-line-utilities"]
 
 [dependencies]
 regex = "1.10"

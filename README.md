@@ -136,36 +136,6 @@ junit = "junit:junit:4.13.2"
 - **Smart Bundling**: Intelligent bundle recommendations based on priority scoring
 - **Configurable**: All thresholds and behaviors can be customized
 
-## 🛠️ Development
-
-### Running Tests
-```bash
-cargo test
-```
-
-### Development Build
-```bash
-cargo run -- --path test-samples
-```
-
-### Linting & Formatting
-```bash
-cargo fmt
-cargo clippy
-```
-
-## 📄 License
-
-MIT License
-
 ## 🤝 Contributing
 
 Issues and pull requests are welcome!
-
-## 📝 Changelog
-
-### v0.1.0
-- Initial release
-- Version conflict and duplicate dependency detection
-- Bundle recommendation feature
-- Version Catalog support

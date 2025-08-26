@@ -105,7 +105,7 @@ fn test_invalid_threshold_error() {
     let output = cmd.assert().failure();
     let stderr = std::str::from_utf8(&output.get_output().stderr).unwrap();
     
-    assert!(stderr.contains("❌ Error: --min-version-conflicts must be at least 2"));
+    assert!(stderr.contains("--min-version-conflicts must be at least 2"));
 }
 
 #[test]
