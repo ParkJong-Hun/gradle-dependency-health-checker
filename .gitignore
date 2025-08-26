@@ -1,0 +1,23 @@
+# Rust
+/target/
+Cargo.lock
+
+# IDE files
+/.idea/
+*.iml
+*.iws
+*.ipr
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Misc
+*.swp
+*.swo
+*~
