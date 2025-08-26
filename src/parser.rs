@@ -12,7 +12,7 @@ pub struct Dependency {
     pub version: Option<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DependencyLocation {
     pub dependency: Dependency,
     pub file_path: PathBuf,

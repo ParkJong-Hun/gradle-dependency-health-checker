@@ -3,3 +3,4 @@ pub mod parser;
 pub mod analyzer;
 pub mod display;
 pub mod version_catalog;
+pub mod bundle_analyzer;
