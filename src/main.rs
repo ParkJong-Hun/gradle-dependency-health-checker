@@ -7,8 +7,8 @@ use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
 #[derive(Parser)]
-#[command(name = "find-bundle-candidates")]
-#[command(about = "Find duplicate dependencies across build.gradle files")]
+#[command(name = "gradle-dependency-health-checker")]
+#[command(about = "Check for duplicate dependencies and version conflicts in Gradle projects")]
 struct Args {
     #[arg(short, long, default_value = ".")]
     path: PathBuf,
