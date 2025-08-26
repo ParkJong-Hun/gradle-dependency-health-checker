@@ -1,4 +1,5 @@
 use clap::Parser;
+use colored::*;
 use regex::Regex;
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -122,7 +123,13 @@ fn parse_dependencies_from_file(file_path: &Path) -> Result<Vec<DependencyLocati
     Ok(dependencies)
 }
 
-fn find_duplicate_dependencies(root_path: &Path) -> Result<HashMap<String, Vec<DependencyLocation>>, Box<dyn std::error::Error>> {
+#[derive(Debug)]
+struct DuplicateAnalysis {
+    regular_duplicates: HashMap<String, Vec<DependencyLocation>>,
+    version_conflicts: HashMap<String, Vec<DependencyLocation>>,
+}
+
+fn find_duplicate_dependencies(root_path: &Path) -> Result<DuplicateAnalysis, Box<dyn std::error::Error>> {
     let gradle_files = find_gradle_files(root_path)?;
     let mut all_dependencies = Vec::new();
     
@@ -139,11 +146,12 @@ fn find_duplicate_dependencies(root_path: &Path) -> Result<HashMap<String, Vec<D
         dependency_groups.entry(key).or_default().push(dep_location);
     }
     
-    // Filter to only duplicates (appearing in more than one location)
-    let mut duplicates = HashMap::new();
+    // Separate regular duplicates from version conflicts
+    let mut regular_duplicates = HashMap::new();
+    let mut version_conflicts = HashMap::new();
+    
     for (key, locations) in dependency_groups {
         if locations.len() > 1 {
-            // Check if they appear in different files or with different versions
             let mut unique_files = HashSet::new();
             let mut unique_versions = HashSet::new();
             
@@ -154,26 +162,57 @@ fn find_duplicate_dependencies(root_path: &Path) -> Result<HashMap<String, Vec<D
                 }
             }
             
-            if unique_files.len() > 1 || unique_versions.len() > 1 {
-                duplicates.insert(key, locations);
+            // Only consider it if it appears in different files
+            if unique_files.len() > 1 {
+                if unique_versions.len() > 1 {
+                    // Same dependency, different versions = version conflict
+                    version_conflicts.insert(key, locations);
+                } else {
+                    // Same dependency, same version = regular duplicate
+                    regular_duplicates.insert(key, locations);
+                }
             }
         }
     }
     
-    Ok(duplicates)
+    Ok(DuplicateAnalysis {
+        regular_duplicates,
+        version_conflicts,
+    })
 }
 
-fn print_duplicates(duplicates: &HashMap<String, Vec<DependencyLocation>>) {
+fn print_regular_duplicates(duplicates: &HashMap<String, Vec<DependencyLocation>>) {
     for (dependency_key, locations) in duplicates {
         println!("\n📦 Dependency: {}", dependency_key);
         
         for location in locations {
             let version_str = location.dependency.version
                 .as_ref()
-                .map(|v| format!(" (version: {})", v))
+                .map(|v| format!(" (version: {})", v.bold()))
                 .unwrap_or_default();
                 
             println!("  📍 {}:{} - {} configuration{}",
+                location.file_path.display(),
+                location.line_number,
+                location.configuration,
+                version_str
+            );
+        }
+    }
+}
+
+fn print_version_conflicts(conflicts: &HashMap<String, Vec<DependencyLocation>>) {
+    for (dependency_key, locations) in conflicts {
+        println!("\n{} {}", "🚨".red(), format!("Dependency: {}", dependency_key).red().bold());
+        
+        for location in locations {
+            let version_str = location.dependency.version
+                .as_ref()
+                .map(|v| format!(" (version: {})", v.red().bold()).to_string())
+                .unwrap_or_default();
+                
+            println!("  {} {}:{} - {} configuration{}",
+                "⚠️".red(),
                 location.file_path.display(),
                 location.line_number,
                 location.configuration,
@@ -187,12 +226,28 @@ fn main() {
     let args = Args::parse();
     
     match find_duplicate_dependencies(&args.path) {
-        Ok(duplicates) => {
-            if duplicates.is_empty() {
-                println!("✅ No duplicate dependencies found.");
+        Ok(analysis) => {
+            let total_issues = analysis.regular_duplicates.len() + analysis.version_conflicts.len();
+            
+            if total_issues == 0 {
+                println!("✅ No duplicate dependencies or version conflicts found.");
             } else {
-                println!("⚠️  Found {} duplicate dependencies:", duplicates.len());
-                print_duplicates(&duplicates);
+                if !analysis.version_conflicts.is_empty() {
+                    println!("{} {} {}:",
+                        "🚨".red(),
+                        "Found".red().bold(),
+                        format!("{} version conflicts", analysis.version_conflicts.len()).red().bold()
+                    );
+                    print_version_conflicts(&analysis.version_conflicts);
+                }
+                
+                if !analysis.regular_duplicates.is_empty() {
+                    if !analysis.version_conflicts.is_empty() {
+                        println!();
+                    }
+                    println!("⚠️  Found {} duplicate dependencies:", analysis.regular_duplicates.len());
+                    print_regular_duplicates(&analysis.regular_duplicates);
+                }
             }
         }
         Err(e) => {
