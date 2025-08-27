@@ -107,4 +107,16 @@ pub mod regex_patterns {
     pub const MAP_DEPENDENCY_2: &str = r#"^\s*(\w+)\s*\(\s*name\s*:\s*["']([^"']+)["']\s*,\s*group\s*:\s*["']([^"']+)["']\s*,\s*version\s*:\s*["']([^"']+)["']\s*\).*$"#;
     pub const LIBS_DEPENDENCY: &str = r#"^\s*(\w+)\s+libs\.([a-zA-Z0-9.\-_]+)\s*.*$"#;
     pub const DEPENDENCIES_BLOCK: &str = r"dependencies";
+    
+    // Plugin patterns
+    pub const PLUGINS_BLOCK: &str = r"plugins";
+    pub const PLUGIN_ID_VERSION: &str = r#"^\s*id\s+["']([^"']+)["']\s+version\s+["']([^"']+)["'].*$"#;
+    pub const PLUGIN_ID_ONLY: &str = r#"^\s*id\s+["']([^"']+)["']\s*$"#;
+    pub const PLUGIN_KOTLIN_DSL_ID_VERSION: &str = r#"^\s*id\s*\(\s*["']([^"']+)["']\s*\)\s+version\s+["']([^"']+)["'].*$"#;
+    pub const PLUGIN_KOTLIN_DSL_ID_ONLY: &str = r#"^\s*id\s*\(\s*["']([^"']+)["']\s*\)\s*$"#;
+    pub const PLUGIN_KOTLIN_SHORTHAND_VERSION: &str = r#"^\s*kotlin\s*\(\s*["']([^"']+)["']\s*\)\s+version\s+["']([^"']+)["'].*$"#;
+    pub const PLUGIN_KOTLIN_SHORTHAND_ONLY: &str = r#"^\s*([a-zA-Z\-]+)\s*$"#;
+    pub const APPLY_PLUGIN: &str = r#"^\s*apply\s*\(\s*plugin\s*=\s*["']([^"']+)["']\s*\).*$"#;
+    pub const APPLY_PLUGIN_GROOVY: &str = r#"^\s*apply\s+plugin\s*:\s*["']([^"']+)["'].*$"#;
+    pub const LIBS_PLUGIN: &str = r#"^\s*alias\s*\(\s*libs\.plugins\.([a-zA-Z0-9\.\-_]+)\s*\).*$"#;
 }

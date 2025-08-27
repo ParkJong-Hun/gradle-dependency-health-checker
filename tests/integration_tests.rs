@@ -194,7 +194,7 @@ fn test_help_message() {
     let stdout = std::str::from_utf8(&output.get_output().stdout).unwrap();
     
     assert!(stdout.contains("gradle-dependency-health-checker"));
-    assert!(stdout.contains("Check for duplicate dependencies and version conflicts"));
+    assert!(stdout.contains("Check for duplicate dependencies, plugins, and version conflicts"));
     assert!(stdout.contains("--min-version-conflicts"));
     assert!(stdout.contains("--min-duplicate-dependencies"));
 }

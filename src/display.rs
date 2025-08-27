@@ -6,7 +6,7 @@
  */
 
 use crate::config::BundleNamePatterns;
-use crate::parser::{DependencyLocation, DependencySourceType};
+use crate::parser::{DependencyLocation, DependencySourceType, PluginLocation, PluginSourceType};
 use crate::bundle_analyzer::{DependencyBundle, BundleAnalysis};
 use colored::*;
 use std::collections::HashMap;
@@ -156,4 +156,33 @@ fn find_most_common_group(dependencies: &[String]) -> String {
         .max_by_key(|(_, count)| *count)
         .map(|(group, _)| group.clone())
         .unwrap_or_else(|| "common".to_string())
+}
+
+pub fn print_duplicate_plugins(duplicates: &HashMap<String, Vec<PluginLocation>>) {
+    for (plugin_id, locations) in duplicates {
+        println!("\n🔌 Plugin: {}", plugin_id);
+        
+        for location in locations {
+            let version_str = location.plugin.version
+                .as_ref()
+                .map(|v| format!(" (version: {})", v.bold()))
+                .unwrap_or_default();
+            
+            let source_str = match &location.source_type {
+                PluginSourceType::PluginsBlock => " [plugins block]",
+                PluginSourceType::ApplyPlugin => " [apply plugin]",
+                PluginSourceType::VersionCatalog(ref_name) => {
+                    &format!(" [via libs.plugins.{}]", ref_name)
+                },
+            };
+                
+            println!("  🔍 {}:{} - {}{}{}",
+                location.file_path.display(),
+                location.line_number,
+                "plugin",
+                version_str,
+                source_str.dimmed()
+            );
+        }
+    }
 }

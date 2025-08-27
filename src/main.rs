@@ -19,7 +19,7 @@ use colored::*;
 use cli::{Args, validate_args};
 use config::Config;
 use analyzer::perform_complete_analysis;
-use display::{print_version_conflicts, print_regular_duplicates, print_bundle_recommendations};
+use display::{print_version_conflicts, print_regular_duplicates, print_bundle_recommendations, print_duplicate_plugins};
 
 fn main() {
     let args = Args::parse();
@@ -36,17 +36,19 @@ fn main() {
         Ok(analysis) => {
             let version_conflicts_count = analysis.duplicate_analysis.version_conflicts.len();
             let duplicate_dependencies_count = analysis.duplicate_analysis.regular_duplicates.len();
+            let duplicate_plugins_count = analysis.plugin_analysis.duplicate_plugins.len();
             let bundle_recommendations_count = analysis.bundle_analysis.recommended_bundles.len();
             
             let show_version_conflicts = version_conflicts_count >= args.min_version_conflicts();
             let show_duplicate_dependencies = duplicate_dependencies_count >= args.min_duplicate_dependencies();
+            let show_duplicate_plugins = duplicate_plugins_count > 0;
             let show_bundle_recommendations = bundle_recommendations_count > 0;
             
-            if !show_version_conflicts && !show_duplicate_dependencies && !show_bundle_recommendations {
+            if !show_version_conflicts && !show_duplicate_dependencies && !show_duplicate_plugins && !show_bundle_recommendations {
                 println!("✅ No issues found above the specified thresholds.");
-                if version_conflicts_count > 0 || duplicate_dependencies_count > 0 {
-                    println!("   (Found {} version conflicts and {} duplicate dependencies below thresholds)", 
-                        version_conflicts_count, duplicate_dependencies_count);
+                if version_conflicts_count > 0 || duplicate_dependencies_count > 0 || duplicate_plugins_count > 0 {
+                    println!("   (Found {} version conflicts, {} duplicate dependencies, and {} duplicate plugins below thresholds)", 
+                        version_conflicts_count, duplicate_dependencies_count, duplicate_plugins_count);
                 }
             } else {
                 if show_version_conflicts {
@@ -64,6 +66,14 @@ fn main() {
                     }
                     println!("⚠️  Found {} duplicate dependencies:", duplicate_dependencies_count);
                     print_regular_duplicates(&analysis.duplicate_analysis.regular_duplicates);
+                }
+                
+                if show_duplicate_plugins {
+                    if show_version_conflicts || show_duplicate_dependencies {
+                        println!();
+                    }
+                    println!("🔌 Found {} duplicate plugins:", duplicate_plugins_count);
+                    print_duplicate_plugins(&analysis.plugin_analysis.duplicate_plugins);
                 }
                 
                 if show_bundle_recommendations {

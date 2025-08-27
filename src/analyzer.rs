@@ -6,7 +6,7 @@
  */
 
 use crate::error::{Result};
-use crate::parser::{DependencyLocation, find_gradle_files, parse_dependencies_from_file, load_version_catalogs};
+use crate::parser::{DependencyLocation, PluginLocation, find_gradle_files, parse_dependencies_from_file, parse_plugins_from_file, load_version_catalogs};
 use crate::bundle_analyzer::{find_dependency_bundles, BundleAnalysis};
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
@@ -18,8 +18,14 @@ pub struct DuplicateAnalysis {
 }
 
 #[derive(Debug)]
+pub struct PluginAnalysis {
+    pub duplicate_plugins: HashMap<String, Vec<PluginLocation>>,
+}
+
+#[derive(Debug)]
 pub struct CompleteAnalysis {
     pub duplicate_analysis: DuplicateAnalysis,
+    pub plugin_analysis: PluginAnalysis,
     pub bundle_analysis: BundleAnalysis,
 }
 
@@ -29,15 +35,20 @@ pub fn perform_complete_analysis(
     min_bundle_modules: usize,
 ) -> Result<CompleteAnalysis> {
     let all_dependencies = load_all_dependencies(root_path)?;
+    let all_plugins = load_all_plugins(root_path)?;
     
     // Perform duplicate analysis
     let duplicate_analysis = analyze_duplicates(&all_dependencies);
+    
+    // Perform plugin analysis
+    let plugin_analysis = analyze_plugins(&all_plugins);
     
     // Perform bundle analysis
     let bundle_analysis = find_dependency_bundles(&all_dependencies, min_bundle_size, min_bundle_modules);
     
     Ok(CompleteAnalysis {
         duplicate_analysis,
+        plugin_analysis,
         bundle_analysis,
     })
 }
@@ -53,6 +64,19 @@ fn load_all_dependencies(root_path: &Path) -> Result<Vec<DependencyLocation>> {
     }
     
     Ok(all_dependencies)
+}
+
+fn load_all_plugins(root_path: &Path) -> Result<Vec<PluginLocation>> {
+    let gradle_files = find_gradle_files(root_path)?;
+    let version_catalogs = load_version_catalogs(root_path)?;
+    let mut all_plugins = Vec::new();
+    
+    for gradle_file in gradle_files {
+        let mut plugins = parse_plugins_from_file(&gradle_file, &version_catalogs)?;
+        all_plugins.append(&mut plugins);
+    }
+    
+    Ok(all_plugins)
 }
 
 fn create_dependency_key(group: &str, artifact: &str) -> String {
@@ -117,5 +141,36 @@ fn analyze_dependency_group(locations: &[&DependencyLocation]) -> Option<(bool, 
         Some((is_version_conflict, locations_owned))
     } else {
         None
+    }
+}
+
+fn analyze_plugins(all_plugins: &[PluginLocation]) -> PluginAnalysis {
+    let mut plugin_groups: HashMap<String, Vec<&PluginLocation>> = HashMap::new();
+    
+    // Group plugins by ID
+    for plugin_location in all_plugins {
+        let key = plugin_location.plugin.id.clone();
+        plugin_groups.entry(key).or_default().push(plugin_location);
+    }
+    
+    let mut duplicate_plugins = HashMap::new();
+    
+    for (plugin_id, locations) in plugin_groups {
+        if locations.len() > 1 {
+            // Check if plugins appear in different files
+            let mut unique_files = HashSet::new();
+            for location in &locations {
+                unique_files.insert(&location.file_path);
+            }
+            
+            if unique_files.len() > 1 {
+                let locations_owned: Vec<PluginLocation> = locations.iter().map(|&loc| loc.clone()).collect();
+                duplicate_plugins.insert(plugin_id, locations_owned);
+            }
+        }
+    }
+    
+    PluginAnalysis {
+        duplicate_plugins,
     }
 }

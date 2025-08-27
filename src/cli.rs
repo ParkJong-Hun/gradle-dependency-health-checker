@@ -12,7 +12,8 @@ use std::path::PathBuf;
 
 #[derive(Parser)]
 #[command(name = "gradle-dependency-health-checker")]
-#[command(about = "Check for duplicate dependencies and version conflicts in Gradle projects")]
+#[command(about = "Check for duplicate dependencies, plugins, and version conflicts in Gradle projects")]
+#[command(version = env!("CARGO_PKG_VERSION"))]
 pub struct Args {
     #[arg(short, long, default_value = ".")]
     pub path: PathBuf,

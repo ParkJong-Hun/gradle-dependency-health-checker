@@ -39,7 +39,9 @@ pub enum VersionRef {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct PluginDefinition {
     pub id: String,
-    pub version: Option<String>,
+    pub version: Option<VersionRef>,
+    #[serde(rename = "version.ref")]
+    pub version_ref: Option<String>,
 }
 
 pub fn find_version_catalog_files(root_path: &Path) -> Result<Vec<PathBuf>> {
@@ -90,5 +92,28 @@ impl VersionCatalog {
         };
         
         Some((group, name, version))
+    }
+    
+    pub fn resolve_plugin_version(&self, plugin_name: &str) -> Option<(String, Option<String>)> {
+        let plugins = self.plugins.as_ref()?;
+        let plugin_def = plugins.get(plugin_name)?;
+        
+        let id = plugin_def.id.clone();
+        
+        // Try to get version from version_ref first, then from version field
+        let version = if let Some(version_ref) = &plugin_def.version_ref {
+            self.versions.as_ref()?.get(version_ref).cloned()
+        } else if let Some(version) = &plugin_def.version {
+            match version {
+                VersionRef::Direct(v) => Some(v.clone()),
+                VersionRef::Reference { r#ref } => {
+                    self.versions.as_ref()?.get(r#ref).cloned()
+                }
+            }
+        } else {
+            None
+        };
+        
+        Some((id, version))
     }
 }

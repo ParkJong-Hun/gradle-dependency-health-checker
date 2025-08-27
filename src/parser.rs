@@ -36,11 +36,44 @@ pub enum DependencySourceType {
     VersionCatalog(String), // The libs.xxx reference
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Plugin {
+    pub id: String,
+    pub version: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct PluginLocation {
+    pub plugin: Plugin,
+    pub file_path: PathBuf,
+    pub line_number: usize,
+    pub source_type: PluginSourceType,
+}
+
+#[derive(Debug, Clone)]
+pub enum PluginSourceType {
+    PluginsBlock,
+    ApplyPlugin,
+    VersionCatalog(String), // The libs.plugins.xxx reference
+}
+
 struct DependencyPatterns {
     string_dep: Regex,
     map_dep_group_first: Regex,
     map_dep_name_first: Regex,
     libs_dep: Regex,
+}
+
+struct PluginPatterns {
+    plugin_id_version: Regex,
+    plugin_id_only: Regex,
+    plugin_kotlin_dsl_id_version: Regex,
+    plugin_kotlin_dsl_id_only: Regex,
+    plugin_kotlin_shorthand_version: Regex,
+    plugin_kotlin_shorthand_only: Regex,
+    apply_plugin: Regex,
+    apply_plugin_groovy: Regex,
+    libs_plugin: Regex,
 }
 
 fn create_dependency_patterns() -> Result<DependencyPatterns> {
@@ -49,6 +82,20 @@ fn create_dependency_patterns() -> Result<DependencyPatterns> {
         map_dep_group_first: Regex::new(regex_patterns::MAP_DEPENDENCY_1)?,
         map_dep_name_first: Regex::new(regex_patterns::MAP_DEPENDENCY_2)?,
         libs_dep: Regex::new(regex_patterns::LIBS_DEPENDENCY)?,
+    })
+}
+
+fn create_plugin_patterns() -> Result<PluginPatterns> {
+    Ok(PluginPatterns {
+        plugin_id_version: Regex::new(regex_patterns::PLUGIN_ID_VERSION)?,
+        plugin_id_only: Regex::new(regex_patterns::PLUGIN_ID_ONLY)?,
+        plugin_kotlin_dsl_id_version: Regex::new(regex_patterns::PLUGIN_KOTLIN_DSL_ID_VERSION)?,
+        plugin_kotlin_dsl_id_only: Regex::new(regex_patterns::PLUGIN_KOTLIN_DSL_ID_ONLY)?,
+        plugin_kotlin_shorthand_version: Regex::new(regex_patterns::PLUGIN_KOTLIN_SHORTHAND_VERSION)?,
+        plugin_kotlin_shorthand_only: Regex::new(regex_patterns::PLUGIN_KOTLIN_SHORTHAND_ONLY)?,
+        apply_plugin: Regex::new(regex_patterns::APPLY_PLUGIN)?,
+        apply_plugin_groovy: Regex::new(regex_patterns::APPLY_PLUGIN_GROOVY)?,
+        libs_plugin: Regex::new(regex_patterns::LIBS_PLUGIN)?,
     })
 }
 
@@ -81,6 +128,66 @@ pub fn load_version_catalogs(root_path: &Path) -> Result<HashMap<PathBuf, Versio
     }
     
     Ok(catalogs)
+}
+
+pub fn parse_plugins_from_file(
+    file_path: &Path,
+    version_catalogs: &HashMap<PathBuf, VersionCatalog>
+) -> Result<Vec<PluginLocation>> {
+    let content = fs::read_to_string(file_path)?;
+    let mut plugins = Vec::new();
+    let mut in_plugins_block = false;
+    let mut brace_count = 0;
+    
+    let patterns = create_plugin_patterns()?;
+    
+    for (line_number, line) in content.lines().enumerate() {
+        let trimmed_line = line.trim();
+        
+        // Check if we're entering a plugins block
+        if trimmed_line.starts_with(regex_patterns::PLUGINS_BLOCK) && trimmed_line.contains('{') {
+            in_plugins_block = true;
+            brace_count = 1;
+            continue;
+        }
+        
+        // Parse apply plugin statements anywhere in the file
+        if let Some(plugin) = parse_apply_plugin(&patterns.apply_plugin, trimmed_line, file_path, line_number + 1)? {
+            plugins.push(plugin);
+        } else if let Some(plugin) = parse_apply_plugin(&patterns.apply_plugin_groovy, trimmed_line, file_path, line_number + 1)? {
+            plugins.push(plugin);
+        }
+        
+        if in_plugins_block {
+            // Count braces to track nested blocks
+            brace_count += trimmed_line.matches('{').count();
+            brace_count -= trimmed_line.matches('}').count();
+            
+            if brace_count == 0 {
+                in_plugins_block = false;
+                continue;
+            }
+            
+            // Parse different plugin formats inside plugins block - check versioned patterns first
+            if let Some(plugin) = parse_plugin_id_version(&patterns.plugin_id_version, trimmed_line, file_path, line_number + 1)? {
+                plugins.push(plugin);
+            } else if let Some(plugin) = parse_plugin_kotlin_dsl_id_version(&patterns.plugin_kotlin_dsl_id_version, trimmed_line, file_path, line_number + 1)? {
+                plugins.push(plugin);
+            } else if let Some(plugin) = parse_plugin_kotlin_shorthand_version(&patterns.plugin_kotlin_shorthand_version, trimmed_line, file_path, line_number + 1)? {
+                plugins.push(plugin);
+            } else if let Some(plugin) = parse_plugin_id_only(&patterns.plugin_id_only, trimmed_line, file_path, line_number + 1)? {
+                plugins.push(plugin);
+            } else if let Some(plugin) = parse_plugin_kotlin_dsl_id_only(&patterns.plugin_kotlin_dsl_id_only, trimmed_line, file_path, line_number + 1)? {
+                plugins.push(plugin);
+            } else if let Some(plugin) = parse_plugin_kotlin_shorthand_only(&patterns.plugin_kotlin_shorthand_only, trimmed_line, file_path, line_number + 1)? {
+                plugins.push(plugin);
+            } else if let Some(plugin) = parse_libs_plugin(&patterns.libs_plugin, trimmed_line, file_path, line_number + 1, version_catalogs)? {
+                plugins.push(plugin);
+            }
+        }
+    }
+    
+    Ok(plugins)
 }
 
 pub fn parse_dependencies_from_file(
@@ -248,6 +355,207 @@ fn parse_libs_dependency(
                     file_path,
                     line_number,
                     DependencySourceType::VersionCatalog(lib_reference),
+                )));
+            }
+        }
+    }
+    
+    Ok(None)
+}
+
+fn create_plugin_location(
+    id: String,
+    version: Option<String>,
+    file_path: &Path,
+    line_number: usize,
+    source_type: PluginSourceType,
+) -> PluginLocation {
+    PluginLocation {
+        plugin: Plugin { id, version },
+        file_path: file_path.to_path_buf(),
+        line_number,
+        source_type,
+    }
+}
+
+fn parse_plugin_id_version(
+    regex: &Regex,
+    line: &str,
+    file_path: &Path,
+    line_number: usize,
+) -> Result<Option<PluginLocation>> {
+    if let Some(captures) = regex.captures(line) {
+        let id = captures[1].to_string();
+        let version = Some(captures[2].to_string());
+        
+        Ok(Some(create_plugin_location(
+            id,
+            version,
+            file_path,
+            line_number,
+            PluginSourceType::PluginsBlock,
+        )))
+    } else {
+        Ok(None)
+    }
+}
+
+fn parse_plugin_id_only(
+    regex: &Regex,
+    line: &str,
+    file_path: &Path,
+    line_number: usize,
+) -> Result<Option<PluginLocation>> {
+    if let Some(captures) = regex.captures(line) {
+        let id = captures[1].to_string();
+        
+        Ok(Some(create_plugin_location(
+            id,
+            None,
+            file_path,
+            line_number,
+            PluginSourceType::PluginsBlock,
+        )))
+    } else {
+        Ok(None)
+    }
+}
+
+fn parse_plugin_kotlin_dsl_id_version(
+    regex: &Regex,
+    line: &str,
+    file_path: &Path,
+    line_number: usize,
+) -> Result<Option<PluginLocation>> {
+    if let Some(captures) = regex.captures(line) {
+        let id = captures[1].to_string();
+        let version = Some(captures[2].to_string());
+        
+        Ok(Some(create_plugin_location(
+            id,
+            version,
+            file_path,
+            line_number,
+            PluginSourceType::PluginsBlock,
+        )))
+    } else {
+        Ok(None)
+    }
+}
+
+fn parse_plugin_kotlin_dsl_id_only(
+    regex: &Regex,
+    line: &str,
+    file_path: &Path,
+    line_number: usize,
+) -> Result<Option<PluginLocation>> {
+    if let Some(captures) = regex.captures(line) {
+        let id = captures[1].to_string();
+        
+        Ok(Some(create_plugin_location(
+            id,
+            None,
+            file_path,
+            line_number,
+            PluginSourceType::PluginsBlock,
+        )))
+    } else {
+        Ok(None)
+    }
+}
+
+fn parse_plugin_kotlin_shorthand_version(
+    regex: &Regex,
+    line: &str,
+    file_path: &Path,
+    line_number: usize,
+) -> Result<Option<PluginLocation>> {
+    if let Some(captures) = regex.captures(line) {
+        let kotlin_type = captures[1].to_string();
+        let version = Some(captures[2].to_string());
+        let id = format!("org.jetbrains.kotlin.{}", kotlin_type);
+        
+        Ok(Some(create_plugin_location(
+            id,
+            version,
+            file_path,
+            line_number,
+            PluginSourceType::PluginsBlock,
+        )))
+    } else {
+        Ok(None)
+    }
+}
+
+fn parse_plugin_kotlin_shorthand_only(
+    regex: &Regex,
+    line: &str,
+    file_path: &Path,
+    line_number: usize,
+) -> Result<Option<PluginLocation>> {
+    if let Some(captures) = regex.captures(line) {
+        let plugin_name = captures[1].to_string();
+        
+        // Only handle common plugin names to avoid false matches
+        let id = match plugin_name.as_str() {
+            "application" => "application".to_string(),
+            "java-library" => "java-library".to_string(),
+            "java" => "java".to_string(),
+            _ => return Ok(None),
+        };
+        
+        Ok(Some(create_plugin_location(
+            id,
+            None,
+            file_path,
+            line_number,
+            PluginSourceType::PluginsBlock,
+        )))
+    } else {
+        Ok(None)
+    }
+}
+
+fn parse_apply_plugin(
+    regex: &Regex,
+    line: &str,
+    file_path: &Path,
+    line_number: usize,
+) -> Result<Option<PluginLocation>> {
+    if let Some(captures) = regex.captures(line) {
+        let id = captures[1].to_string();
+        
+        Ok(Some(create_plugin_location(
+            id,
+            None,
+            file_path,
+            line_number,
+            PluginSourceType::ApplyPlugin,
+        )))
+    } else {
+        Ok(None)
+    }
+}
+
+fn parse_libs_plugin(
+    regex: &Regex,
+    line: &str,
+    file_path: &Path,
+    line_number: usize,
+    version_catalogs: &HashMap<PathBuf, VersionCatalog>,
+) -> Result<Option<PluginLocation>> {
+    if let Some(captures) = regex.captures(line) {
+        let plugin_reference = captures[1].to_string();
+        
+        // Try to resolve from version catalogs
+        for catalog in version_catalogs.values() {
+            if let Some((id, version)) = catalog.resolve_plugin_version(&plugin_reference) {
+                return Ok(Some(create_plugin_location(
+                    id,
+                    version,
+                    file_path,
+                    line_number,
+                    PluginSourceType::VersionCatalog(plugin_reference),
                 )));
             }
         }
