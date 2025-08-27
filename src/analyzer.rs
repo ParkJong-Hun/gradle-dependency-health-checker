@@ -8,21 +8,22 @@
 use crate::error::{Result};
 use crate::parser::{DependencyLocation, PluginLocation, find_gradle_files, parse_dependencies_from_file, parse_plugins_from_file, load_version_catalogs};
 use crate::bundle_analyzer::{find_dependency_bundles, BundleAnalysis};
+use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct DuplicateAnalysis {
     pub regular_duplicates: HashMap<String, Vec<DependencyLocation>>,
     pub version_conflicts: HashMap<String, Vec<DependencyLocation>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct PluginAnalysis {
     pub duplicate_plugins: HashMap<String, Vec<PluginLocation>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct CompleteAnalysis {
     pub duplicate_analysis: DuplicateAnalysis,
     pub plugin_analysis: PluginAnalysis,

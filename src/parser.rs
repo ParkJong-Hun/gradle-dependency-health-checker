@@ -9,19 +9,20 @@ use crate::config::{file_patterns, regex_patterns};
 use crate::error::{Result};
 use crate::version_catalog::{find_version_catalog_files, parse_version_catalog, VersionCatalog};
 use regex::Regex;
+use serde::Serialize;
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
 pub struct Dependency {
     pub group: String,
     pub artifact: String,
     pub version: Option<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct DependencyLocation {
     pub dependency: Dependency,
     pub file_path: PathBuf,
@@ -30,19 +31,19 @@ pub struct DependencyLocation {
     pub source_type: DependencySourceType,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub enum DependencySourceType {
     Direct,
     VersionCatalog(String), // The libs.xxx reference
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
 pub struct Plugin {
     pub id: String,
     pub version: Option<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct PluginLocation {
     pub plugin: Plugin,
     pub file_path: PathBuf,
@@ -50,7 +51,7 @@ pub struct PluginLocation {
     pub source_type: PluginSourceType,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub enum PluginSourceType {
     PluginsBlock,
     ApplyPlugin,

@@ -20,6 +20,9 @@ pub struct Args {
     
     #[arg(short, long, default_value = ".", global = true, help = "Path to the Gradle project to analyze")]
     pub path: PathBuf,
+    
+    #[arg(short, long, global = true, help = "Output results to JSON file instead of console")]
+    pub output: Option<PathBuf>,
 }
 
 #[derive(Subcommand)]

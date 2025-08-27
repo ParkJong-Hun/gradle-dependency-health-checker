@@ -7,10 +7,11 @@
 
 use crate::config::Config;
 use crate::parser::DependencyLocation;
+use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct DependencyBundle {
     pub dependencies: Vec<String>, // group:artifact format
     pub modules: Vec<PathBuf>,
@@ -20,7 +21,7 @@ pub struct DependencyBundle {
     pub priority_score: f64,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct BundleAnalysis {
     pub recommended_bundles: Vec<DependencyBundle>,
     pub total_bundles_found: usize,

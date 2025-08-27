@@ -10,6 +10,7 @@ mod common;
 use assert_cmd::Command;
 use common::{create_test_build_gradle, create_test_version_catalog};
 use tempfile::tempdir;
+use std::fs;
 
 #[test]
 fn test_end_to_end_basic_functionality() {
@@ -211,4 +212,89 @@ fn test_nonexistent_path() {
     cmd.arg("--path").arg("/nonexistent/path");
     
     cmd.assert().failure();
+}
+
+#[test]
+fn test_json_output() {
+    let temp_dir = tempdir().unwrap();
+    
+    // Create test build files with some conflicts
+    let app_build_gradle = r#"
+dependencies {
+    implementation 'com.squareup.okhttp3:okhttp:4.10.0'
+    implementation 'com.google.code.gson:gson:2.9.0'
+}
+"#;
+    create_test_build_gradle(temp_dir.path(), "app/build.gradle", app_build_gradle);
+    
+    let lib_build_gradle = r#"
+dependencies {
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+    implementation 'com.google.code.gson:gson:2.9.0'
+}
+"#;
+    create_test_build_gradle(temp_dir.path(), "lib/build.gradle", lib_build_gradle);
+    
+    // Create output file path
+    let output_file = temp_dir.path().join("output.json");
+    
+    let mut cmd = Command::cargo_bin("gradle-dependency-health-checker").unwrap();
+    cmd.arg("--path").arg(temp_dir.path())
+       .arg("--output").arg(&output_file);
+    
+    let output = cmd.assert().success();
+    let stdout = std::str::from_utf8(&output.get_output().stdout).unwrap();
+    
+    // Check that success message is shown
+    assert!(stdout.contains("Analysis results written to"));
+    assert!(stdout.contains("output.json"));
+    
+    // Check that JSON file was created and has valid content
+    assert!(output_file.exists());
+    let json_content = fs::read_to_string(&output_file).unwrap();
+    
+    // Basic JSON structure checks
+    assert!(json_content.contains("duplicate_analysis"));
+    assert!(json_content.contains("plugin_analysis"));
+    assert!(json_content.contains("bundle_analysis"));
+    assert!(json_content.contains("version_conflicts"));
+    assert!(json_content.contains("regular_duplicates"));
+    assert!(json_content.contains("duplicate_plugins"));
+    
+    // Parse JSON to ensure it's valid
+    let parsed: serde_json::Value = serde_json::from_str(&json_content).unwrap();
+    assert!(parsed.is_object());
+}
+
+#[test]
+fn test_json_output_with_subcommand() {
+    let temp_dir = tempdir().unwrap();
+    
+    // Create test build files
+    create_test_build_gradle(temp_dir.path(), "build.gradle", r#"
+dependencies {
+    implementation 'junit:junit:4.13.2'
+}
+"#);
+    
+    // Create output file path
+    let output_file = temp_dir.path().join("conflicts.json");
+    
+    let mut cmd = Command::cargo_bin("gradle-dependency-health-checker").unwrap();
+    cmd.arg("--path").arg(temp_dir.path())
+       .arg("conflicts")
+       .arg("--output").arg(&output_file);
+    
+    let output = cmd.assert().success();
+    let stdout = std::str::from_utf8(&output.get_output().stdout).unwrap();
+    
+    // Check that success message is shown
+    assert!(stdout.contains("Analysis results written to"));
+    
+    // Check that JSON file was created
+    assert!(output_file.exists());
+    let json_content = fs::read_to_string(&output_file).unwrap();
+    
+    // Parse JSON to ensure it's valid
+    let _: serde_json::Value = serde_json::from_str(&json_content).unwrap();
 }

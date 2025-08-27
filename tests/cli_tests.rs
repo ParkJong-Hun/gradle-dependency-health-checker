@@ -14,6 +14,7 @@ fn test_valid_all_command() {
     let config = Config::default();
     let args = Args {
         path: std::path::PathBuf::from("."),
+        output: None,
         command: Some(Commands::All {
             min_version_conflicts: Some(2),
             min_duplicate_dependencies: Some(3),
@@ -32,6 +33,7 @@ fn test_invalid_version_conflicts_threshold() {
     let config = Config::default();
     let args = Args {
         path: std::path::PathBuf::from("."),
+        output: None,
         command: Some(Commands::Conflicts {
             min_version_conflicts: Some(1),
         }),
@@ -47,6 +49,7 @@ fn test_invalid_duplicate_dependencies_threshold() {
     let config = Config::default();
     let args = Args {
         path: std::path::PathBuf::from("."),
+        output: None,
         command: Some(Commands::Dependencies {
             min_duplicate_dependencies: Some(0),
         }),
@@ -62,6 +65,7 @@ fn test_invalid_duplicate_plugins_threshold() {
     let config = Config::default();
     let args = Args {
         path: std::path::PathBuf::from("."),
+        output: None,
         command: Some(Commands::Plugins {
             min_duplicate_plugins: Some(1),
         }),
@@ -78,6 +82,7 @@ fn test_parse_args_defaults() {
     
     assert_eq!(args.path, std::path::PathBuf::from("."));
     assert!(args.command.is_none());
+    assert!(args.output.is_none());
 }
 
 #[test]
@@ -145,9 +150,41 @@ fn test_default_behavior_validation() {
     let config = Config::default();
     let args = Args {
         path: std::path::PathBuf::from("."),
+        output: None,
         command: None,
     };
     
     // Default behavior should not require validation
     assert!(validate_args(&args, &config).is_ok());
+}
+
+#[test]
+fn test_parse_output_option() {
+    let args = Args::try_parse_from(&[
+        "program",
+        "--output", "results.json"
+    ]).unwrap();
+    
+    assert_eq!(args.output, Some(std::path::PathBuf::from("results.json")));
+}
+
+#[test]
+fn test_parse_output_with_subcommand() {
+    let args = Args::try_parse_from(&[
+        "program",
+        "--path", "/test/path",
+        "--output", "analysis.json",
+        "conflicts",
+        "--min-version-conflicts", "3"
+    ]).unwrap();
+    
+    assert_eq!(args.path, std::path::PathBuf::from("/test/path"));
+    assert_eq!(args.output, Some(std::path::PathBuf::from("analysis.json")));
+    
+    match args.command {
+        Some(Commands::Conflicts { min_version_conflicts }) => {
+            assert_eq!(min_version_conflicts, Some(3));
+        },
+        _ => panic!("Expected Conflicts command"),
+    }
 }
