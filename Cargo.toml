@@ -1,14 +1,14 @@
 [package]
 name = "gradle-dependency-health-checker"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 authors = ["ParkJong-Hun thesn515@gmail.com"]
-description = "A powerful tool to detect duplicate dependencies, version conflicts, duplicate plugins, and recommend dependency bundles in Gradle projects"
+description = "A powerful tool to detect duplicate dependencies, version conflicts, duplicate plugins, and recommend dependency bundles in Gradle projects with JSON export capabilities"
 readme = "README.md"
 homepage = "https://github.com/ParkJong-Hun/gradle-dependency-health-checker"
 repository = "https://github.com/ParkJong-Hun/gradle-dependency-health-checker"
 license = "MIT"
-keywords = ["gradle", "dependency", "build-tools", "analysis", "plugins"]
+keywords = ["gradle", "dependency", "build-tools", "analysis", "json"]
 categories = ["development-tools", "command-line-utilities"]
 
 [dependencies]

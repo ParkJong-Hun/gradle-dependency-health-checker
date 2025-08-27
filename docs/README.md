@@ -37,6 +37,10 @@ Comprehensive guide to all supported Gradle file formats and syntax patterns.
 - [JSON Output](json-output.md) - Automation and integration
 - [Supported Formats](supported-formats.md) - File format specifications
 
+## 📝 Release Notes
+
+- [CHANGELOG.md](../CHANGELOG.md) - Version history and release notes
+
 ## 💡 Getting Help
 
 - Check the [GitHub Issues](https://github.com/ParkJong-Hun/gradle-dependency-health-checker/issues) for known issues

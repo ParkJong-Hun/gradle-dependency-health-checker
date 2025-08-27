@@ -1,6 +1,6 @@
 # Gradle Dependency Health Checker
 
-A powerful tool to detect duplicate dependencies, version conflicts, and recommend dependency bundles in Gradle projects.
+A powerful tool to detect duplicate dependencies, version conflicts, and recommend dependency bundles in Gradle projects with JSON export capabilities.
 
 ## 🚀 Features
 
