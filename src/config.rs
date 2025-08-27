@@ -8,7 +8,8 @@
 /// Application configuration constants
 pub struct Config {
     pub default_min_version_conflicts: usize,
-    pub default_min_duplicate_dependencies: usize, 
+    pub default_min_duplicate_dependencies: usize,
+    pub default_min_duplicate_plugins: usize,
     pub default_min_bundle_size: usize,
     pub default_min_bundle_modules: usize,
     pub default_max_bundle_recommendations: usize,
@@ -37,6 +38,7 @@ impl Default for Config {
         Self {
             default_min_version_conflicts: 2,
             default_min_duplicate_dependencies: 2,
+            default_min_duplicate_plugins: 2,
             default_min_bundle_size: 2,
             default_min_bundle_modules: 2,
             default_max_bundle_recommendations: 5,

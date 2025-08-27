@@ -24,6 +24,9 @@ pub struct Args {
     #[arg(long, help = "Minimum number of duplicate dependencies to display")]
     pub min_duplicate_dependencies: Option<usize>,
     
+    #[arg(long, help = "Minimum number of duplicate plugins to display")]
+    pub min_duplicate_plugins: Option<usize>,
+    
     #[arg(long, help = "Minimum number of dependencies required for a bundle recommendation")]
     pub min_bundle_size: Option<usize>,
     
@@ -43,6 +46,9 @@ impl Args {
         self.min_duplicate_dependencies = Some(
             self.min_duplicate_dependencies.unwrap_or(config.default_min_duplicate_dependencies)
         );
+        self.min_duplicate_plugins = Some(
+            self.min_duplicate_plugins.unwrap_or(config.default_min_duplicate_plugins)
+        );
         self.min_bundle_size = Some(
             self.min_bundle_size.unwrap_or(config.default_min_bundle_size)
         );
@@ -61,6 +67,10 @@ impl Args {
     
     pub fn min_duplicate_dependencies(&self) -> usize {
         self.min_duplicate_dependencies.unwrap()
+    }
+    
+    pub fn min_duplicate_plugins(&self) -> usize {
+        self.min_duplicate_plugins.unwrap()
     }
     
     pub fn min_bundle_size(&self) -> usize {
@@ -92,6 +102,15 @@ pub fn validate_args(args: &Args, config: &Config) -> Result<()> {
         if value < min_threshold {
             return Err(AnalysisError::Validation(format!(
                 "--min-duplicate-dependencies must be at least {} (duplicates require at least {} occurrences)",
+                min_threshold, min_threshold
+            )));
+        }
+    }
+    
+    if let Some(value) = args.min_duplicate_plugins {
+        if value < min_threshold {
+            return Err(AnalysisError::Validation(format!(
+                "--min-duplicate-plugins must be at least {} (duplicates require at least {} occurrences)",
                 min_threshold, min_threshold
             )));
         }

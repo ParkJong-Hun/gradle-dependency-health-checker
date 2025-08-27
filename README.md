@@ -44,6 +44,7 @@ gradle-dependency-health-checker \
   --path ./my-project \
   --min-version-conflicts 3 \
   --min-duplicate-dependencies 2 \
+  --min-duplicate-plugins 2 \
   --min-bundle-size 2 \
   --min-bundle-modules 3 \
   --max-bundle-recommendations 10
@@ -56,6 +57,7 @@ gradle-dependency-health-checker \
 | `--path` | `.` | Path to the Gradle project to analyze |
 | `--min-version-conflicts` | `2` | Minimum number of version conflicts to display |
 | `--min-duplicate-dependencies` | `2` | Minimum number of duplicate dependencies to display |
+| `--min-duplicate-plugins` | `2` | Minimum number of duplicate plugins to display |
 | `--min-bundle-size` | `2` | Minimum number of dependencies for bundle recommendation |
 | `--min-bundle-modules` | `2` | Minimum number of modules for bundle recommendation |
 | `--max-bundle-recommendations` | `5` | Maximum number of bundle recommendations to display |

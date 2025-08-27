@@ -36,12 +36,15 @@ fn main() {
         Ok(analysis) => {
             let version_conflicts_count = analysis.duplicate_analysis.version_conflicts.len();
             let duplicate_dependencies_count = analysis.duplicate_analysis.regular_duplicates.len();
-            let duplicate_plugins_count = analysis.plugin_analysis.duplicate_plugins.len();
+            let duplicate_plugins_count = analysis.plugin_analysis.duplicate_plugins
+                .iter()
+                .map(|(_, locations)| locations.len())
+                .sum::<usize>();
             let bundle_recommendations_count = analysis.bundle_analysis.recommended_bundles.len();
             
             let show_version_conflicts = version_conflicts_count >= args.min_version_conflicts();
             let show_duplicate_dependencies = duplicate_dependencies_count >= args.min_duplicate_dependencies();
-            let show_duplicate_plugins = duplicate_plugins_count > 0;
+            let show_duplicate_plugins = duplicate_plugins_count >= args.min_duplicate_plugins();
             let show_bundle_recommendations = bundle_recommendations_count > 0;
             
             if !show_version_conflicts && !show_duplicate_dependencies && !show_duplicate_plugins && !show_bundle_recommendations {
