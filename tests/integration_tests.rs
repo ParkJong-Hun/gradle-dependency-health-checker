@@ -84,6 +84,7 @@ dependencies {
     // Test with higher threshold (should show no issues)
     let mut cmd = Command::cargo_bin("gradle-dependency-health-checker").unwrap();
     cmd.arg("--path").arg(temp_dir.path())
+       .arg("all")
        .arg("--min-version-conflicts").arg("3");
     
     let output = cmd.assert().success();
@@ -100,6 +101,7 @@ fn test_invalid_threshold_error() {
     
     let mut cmd = Command::cargo_bin("gradle-dependency-health-checker").unwrap();
     cmd.arg("--path").arg(temp_dir.path())
+       .arg("conflicts")
        .arg("--min-version-conflicts").arg("1");
     
     let output = cmd.assert().failure();
@@ -195,8 +197,12 @@ fn test_help_message() {
     
     assert!(stdout.contains("gradle-dependency-health-checker"));
     assert!(stdout.contains("Check for duplicate dependencies, plugins, and version conflicts"));
-    assert!(stdout.contains("--min-version-conflicts"));
-    assert!(stdout.contains("--min-duplicate-dependencies"));
+    assert!(stdout.contains("conflicts"));
+    assert!(stdout.contains("dependencies"));
+    assert!(stdout.contains("plugins"));
+    assert!(stdout.contains("duplicates"));
+    assert!(stdout.contains("bundles"));
+    assert!(stdout.contains("all"));
 }
 
 #[test]

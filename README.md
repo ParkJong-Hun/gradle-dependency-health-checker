@@ -8,9 +8,11 @@ A powerful tool to detect duplicate dependencies, version conflicts, and recomme
 - **Duplicate Dependency Detection**: Finds dependencies that are declared multiple times across different modules
 - **Duplicate Plugin Detection**: Identifies plugins that are declared multiple times across different modules
 - **Bundle Recommendations**: Suggests creating shared modules for commonly used dependency groups
+- **Flexible Subcommands**: Run specific analyses with targeted commands (`conflicts`, `dependencies`, `plugins`, `duplicates`, `bundles`)
 - **Version Catalog Support**: Full support for Gradle Version Catalogs with version references (`libs.versions.toml`)
 - **Plugin Support**: Detects plugins in `plugins` blocks, `apply plugin`, and Version Catalog references
 - **Multiple Declaration Formats**: Supports string format, map format, and libs.xxx format declarations
+- **Configurable Thresholds**: Customize minimum thresholds for each type of analysis
 
 ## 📦 Installation
 
@@ -31,16 +33,38 @@ cargo build --release
 
 ### Basic Usage
 ```bash
-# Analyze current directory
+# Run all checks (default behavior)
 gradle-dependency-health-checker
 
 # Analyze specific path
 gradle-dependency-health-checker --path /path/to/gradle/project
 ```
 
-### Advanced Options
+### Subcommands - Run Specific Analysis
 ```bash
-gradle-dependency-health-checker \
+# Check for version conflicts only
+gradle-dependency-health-checker conflicts --path ./my-project
+
+# Check for duplicate dependencies only
+gradle-dependency-health-checker dependencies --path ./my-project
+
+# Check for duplicate plugins only
+gradle-dependency-health-checker plugins --path ./my-project
+
+# Check for both duplicate dependencies and plugins
+gradle-dependency-health-checker duplicates --path ./my-project
+
+# Generate bundle recommendations only
+gradle-dependency-health-checker bundles --path ./my-project
+
+# Run all checks explicitly (same as default)
+gradle-dependency-health-checker all --path ./my-project
+```
+
+### Advanced Usage with Custom Thresholds
+```bash
+# Run all checks with custom thresholds
+gradle-dependency-health-checker all \
   --path ./my-project \
   --min-version-conflicts 3 \
   --min-duplicate-dependencies 2 \
@@ -48,13 +72,35 @@ gradle-dependency-health-checker \
   --min-bundle-size 2 \
   --min-bundle-modules 3 \
   --max-bundle-recommendations 10
+
+# Run only conflict analysis with custom threshold
+gradle-dependency-health-checker conflicts \
+  --path ./my-project \
+  --min-version-conflicts 5
 ```
 
-### Option Reference
+### Available Commands
+
+| Command | Description | Available Options |
+|---------|-------------|-------------------|
+| **(default)** | Run all checks | All options available |
+| `all` | Run all checks explicitly | All options available |
+| `conflicts` | Check version conflicts only | `--min-version-conflicts` |
+| `dependencies` | Check duplicate dependencies only | `--min-duplicate-dependencies` |
+| `plugins` | Check duplicate plugins only | `--min-duplicate-plugins` |
+| `duplicates` | Check both dependency and plugin duplicates | `--min-duplicate-dependencies`, `--min-duplicate-plugins` |
+| `bundles` | Generate bundle recommendations only | `--min-bundle-size`, `--min-bundle-modules`, `--max-bundle-recommendations` |
+
+### Global Options
 
 | Option | Default | Description |
 |--------|---------|-------------|
 | `--path` | `.` | Path to the Gradle project to analyze |
+
+### Threshold Options (defaults)
+
+| Option | Default | Description |
+|--------|---------|-------------|
 | `--min-version-conflicts` | `2` | Minimum number of version conflicts to display |
 | `--min-duplicate-dependencies` | `2` | Minimum number of duplicate dependencies to display |
 | `--min-duplicate-plugins` | `2` | Minimum number of duplicate plugins to display |
@@ -178,12 +224,14 @@ application = { id = "application" }
 ## ⚡ Performance & Features
 
 - **Fast Analysis**: Multi-threaded file scanning for quick processing of large projects
+- **Selective Execution**: Run only the analyses you need with targeted subcommands for improved performance
 - **Accurate Parsing**: Regex-based precise dependency parsing
 - **Smart Bundling**: Intelligent bundle recommendations based on priority scoring
 - **Version Reference Resolution**: Automatically resolves `version.ref` references in Version Catalogs
 - **Plugin Support**: Supports both library and plugin version references
 - **Multi-format Plugin Detection**: Detects plugins in `plugins` blocks, `apply plugin` statements, and Version Catalog references
-- **Configurable**: All thresholds and behaviors can be customized
+- **Highly Configurable**: All thresholds and behaviors can be customized per subcommand
+- **User-Friendly CLI**: Intuitive subcommand structure with comprehensive help messages
 
 ## 🤝 Contributing
 

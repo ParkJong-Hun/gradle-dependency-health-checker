@@ -16,7 +16,7 @@ mod error;
 
 use clap::Parser;
 use colored::*;
-use cli::{Args, validate_args};
+use cli::{Args, validate_args, AnalysisOptions};
 use config::Config;
 use analyzer::perform_complete_analysis;
 use display::{print_version_conflicts, print_regular_duplicates, print_bundle_recommendations, print_duplicate_plugins};
@@ -24,7 +24,6 @@ use display::{print_version_conflicts, print_regular_duplicates, print_bundle_re
 fn main() {
     let args = Args::parse();
     let config = Config::default();
-    let args = args.with_defaults(&config);
     
     // Validate threshold arguments
     if let Err(error) = validate_args(&args, &config) {
@@ -32,7 +31,9 @@ fn main() {
         std::process::exit(1);
     }
     
-    match perform_complete_analysis(&args.path, args.min_bundle_size(), args.min_bundle_modules()) {
+    let options = args.get_analysis_options(&config);
+    
+    match perform_complete_analysis(&args.path, options.min_bundle_size, options.min_bundle_modules) {
         Ok(analysis) => {
             let version_conflicts_count = analysis.duplicate_analysis.version_conflicts.len();
             let duplicate_dependencies_count = analysis.duplicate_analysis.regular_duplicates.len();
@@ -42,10 +43,10 @@ fn main() {
                 .sum::<usize>();
             let bundle_recommendations_count = analysis.bundle_analysis.recommended_bundles.len();
             
-            let show_version_conflicts = version_conflicts_count >= args.min_version_conflicts();
-            let show_duplicate_dependencies = duplicate_dependencies_count >= args.min_duplicate_dependencies();
-            let show_duplicate_plugins = duplicate_plugins_count >= args.min_duplicate_plugins();
-            let show_bundle_recommendations = bundle_recommendations_count > 0;
+            let show_version_conflicts = version_conflicts_count >= options.min_version_conflicts;
+            let show_duplicate_dependencies = duplicate_dependencies_count >= options.min_duplicate_dependencies;
+            let show_duplicate_plugins = duplicate_plugins_count >= options.min_duplicate_plugins;
+            let show_bundle_recommendations = bundle_recommendations_count > 0 && options.max_bundle_recommendations > 0;
             
             if !show_version_conflicts && !show_duplicate_dependencies && !show_duplicate_plugins && !show_bundle_recommendations {
                 println!("✅ No issues found above the specified thresholds.");
@@ -80,7 +81,7 @@ fn main() {
                 }
                 
                 if show_bundle_recommendations {
-                    print_bundle_recommendations(&analysis.bundle_analysis, args.max_bundle_recommendations());
+                    print_bundle_recommendations(&analysis.bundle_analysis, options.max_bundle_recommendations);
                 }
             }
         }

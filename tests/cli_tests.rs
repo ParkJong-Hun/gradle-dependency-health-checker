@@ -5,21 +5,23 @@
  * See LICENSE file in the project root for full license information.
  */
 
-use gradle_dependency_health_checker::cli::{Args, validate_args};
+use gradle_dependency_health_checker::cli::{Args, Commands, validate_args};
 use gradle_dependency_health_checker::config::Config;
 use clap::Parser;
 
 #[test]
-fn test_valid_args() {
+fn test_valid_all_command() {
     let config = Config::default();
     let args = Args {
         path: std::path::PathBuf::from("."),
-        min_version_conflicts: Some(2),
-        min_duplicate_dependencies: Some(3),
-        min_duplicate_plugins: Some(2),
-        min_bundle_size: Some(2),
-        min_bundle_modules: Some(2),
-        max_bundle_recommendations: Some(5),
+        command: Some(Commands::All {
+            min_version_conflicts: Some(2),
+            min_duplicate_dependencies: Some(3),
+            min_duplicate_plugins: Some(2),
+            min_bundle_size: Some(2),
+            min_bundle_modules: Some(2),
+            max_bundle_recommendations: Some(5),
+        }),
     };
     
     assert!(validate_args(&args, &config).is_ok());
@@ -30,17 +32,14 @@ fn test_invalid_version_conflicts_threshold() {
     let config = Config::default();
     let args = Args {
         path: std::path::PathBuf::from("."),
-        min_version_conflicts: Some(1),
-        min_duplicate_dependencies: Some(2),
-        min_duplicate_plugins: Some(2),
-        min_bundle_size: Some(2),
-        min_bundle_modules: Some(2),
-        max_bundle_recommendations: Some(5),
+        command: Some(Commands::Conflicts {
+            min_version_conflicts: Some(1),
+        }),
     };
     
     let result = validate_args(&args, &config);
     assert!(result.is_err());
-    assert!(format!("{}", result.unwrap_err()).contains("min-version-conflicts must be at least 2"));
+    assert!(format!("{}", result.unwrap_err()).contains("--min-version-conflicts must be at least 2"));
 }
 
 #[test]
@@ -48,36 +47,29 @@ fn test_invalid_duplicate_dependencies_threshold() {
     let config = Config::default();
     let args = Args {
         path: std::path::PathBuf::from("."),
-        min_version_conflicts: Some(2),
-        min_duplicate_dependencies: Some(0),
-        min_duplicate_plugins: Some(2),
-        min_bundle_size: Some(2),
-        min_bundle_modules: Some(2),
-        max_bundle_recommendations: Some(5),
+        command: Some(Commands::Dependencies {
+            min_duplicate_dependencies: Some(0),
+        }),
     };
     
     let result = validate_args(&args, &config);
     assert!(result.is_err());
-    assert!(format!("{}", result.unwrap_err()).contains("min-duplicate-dependencies must be at least 2"));
+    assert!(format!("{}", result.unwrap_err()).contains("--min-duplicate-dependencies must be at least 2"));
 }
 
 #[test]
-fn test_both_invalid_thresholds() {
+fn test_invalid_duplicate_plugins_threshold() {
     let config = Config::default();
     let args = Args {
         path: std::path::PathBuf::from("."),
-        min_version_conflicts: Some(1),
-        min_duplicate_dependencies: Some(1),
-        min_duplicate_plugins: Some(2),
-        min_bundle_size: Some(2),
-        min_bundle_modules: Some(2),
-        max_bundle_recommendations: Some(5),
+        command: Some(Commands::Plugins {
+            min_duplicate_plugins: Some(1),
+        }),
     };
     
     let result = validate_args(&args, &config);
     assert!(result.is_err());
-    // Should fail on the first validation (version conflicts)
-    assert!(format!("{}", result.unwrap_err()).contains("min-version-conflicts must be at least 2"));
+    assert!(format!("{}", result.unwrap_err()).contains("--min-duplicate-plugins must be at least 2"));
 }
 
 #[test]
@@ -85,25 +77,57 @@ fn test_parse_args_defaults() {
     let args = Args::try_parse_from(&["program"]).unwrap();
     
     assert_eq!(args.path, std::path::PathBuf::from("."));
-    assert_eq!(args.min_version_conflicts, None);
-    assert_eq!(args.min_duplicate_dependencies, None);
-    assert_eq!(args.min_duplicate_plugins, None);
+    assert!(args.command.is_none());
 }
 
 #[test]
-fn test_parse_args_custom_values() {
+fn test_parse_subcommand_conflicts() {
     let args = Args::try_parse_from(&[
         "program",
         "--path", "/custom/path",
-        "--min-version-conflicts", "5",
-        "--min-duplicate-dependencies", "3",
-        "--min-duplicate-plugins", "4"
+        "conflicts",
+        "--min-version-conflicts", "5"
     ]).unwrap();
     
     assert_eq!(args.path, std::path::PathBuf::from("/custom/path"));
-    assert_eq!(args.min_version_conflicts, Some(5));
-    assert_eq!(args.min_duplicate_dependencies, Some(3));
-    assert_eq!(args.min_duplicate_plugins, Some(4));
+    match args.command {
+        Some(Commands::Conflicts { min_version_conflicts }) => {
+            assert_eq!(min_version_conflicts, Some(5));
+        },
+        _ => panic!("Expected Conflicts command"),
+    }
+}
+
+#[test]
+fn test_parse_subcommand_dependencies() {
+    let args = Args::try_parse_from(&[
+        "program",
+        "dependencies",
+        "--min-duplicate-dependencies", "3"
+    ]).unwrap();
+    
+    match args.command {
+        Some(Commands::Dependencies { min_duplicate_dependencies }) => {
+            assert_eq!(min_duplicate_dependencies, Some(3));
+        },
+        _ => panic!("Expected Dependencies command"),
+    }
+}
+
+#[test]
+fn test_parse_subcommand_plugins() {
+    let args = Args::try_parse_from(&[
+        "program",
+        "plugins",
+        "--min-duplicate-plugins", "4"
+    ]).unwrap();
+    
+    match args.command {
+        Some(Commands::Plugins { min_duplicate_plugins }) => {
+            assert_eq!(min_duplicate_plugins, Some(4));
+        },
+        _ => panic!("Expected Plugins command"),
+    }
 }
 
 #[test]
@@ -117,32 +141,13 @@ fn test_parse_args_short_path() {
 }
 
 #[test]
-fn test_parse_args_invalid_threshold() {
-    let config = Config::default();
-    // This should parse successfully but fail validation
-    let args = Args::try_parse_from(&[
-        "program",
-        "--min-version-conflicts", "0"
-    ]).unwrap();
-    
-    assert_eq!(args.min_version_conflicts, Some(0));
-    assert!(validate_args(&args, &config).is_err());
-}
-
-#[test]
-fn test_invalid_duplicate_plugins_threshold() {
+fn test_default_behavior_validation() {
     let config = Config::default();
     let args = Args {
         path: std::path::PathBuf::from("."),
-        min_version_conflicts: Some(2),
-        min_duplicate_dependencies: Some(2),
-        min_duplicate_plugins: Some(1),
-        min_bundle_size: Some(2),
-        min_bundle_modules: Some(2),
-        max_bundle_recommendations: Some(5),
+        command: None,
     };
     
-    let result = validate_args(&args, &config);
-    assert!(result.is_err());
-    assert!(format!("{}", result.unwrap_err()).contains("min-duplicate-plugins must be at least 2"));
+    // Default behavior should not require validation
+    assert!(validate_args(&args, &config).is_ok());
 }
