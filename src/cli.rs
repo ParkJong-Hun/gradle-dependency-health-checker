@@ -23,6 +23,9 @@ pub struct Args {
     
     #[arg(short, long, global = true, help = "Output results to JSON file instead of console")]
     pub output: Option<PathBuf>,
+    
+    #[arg(short, long, global = true, help = "Suppress all output messages (useful with --output)")]
+    pub silent: bool,
 }
 
 #[derive(Subcommand)]

@@ -9,6 +9,8 @@ A powerful tool to detect duplicate dependencies, version conflicts, and recomme
 - **Duplicate Plugin Detection**: Identifies plugins that are declared multiple times across different modules
 - **Bundle Recommendations**: Suggests creating shared modules for commonly used dependency groups
 - **Flexible Subcommands**: Run specific analyses with targeted commands (`conflicts`, `dependencies`, `plugins`, `duplicates`, `bundles`)
+- **JSON Output**: Export analysis results to structured JSON files for integration with other tools
+- **Silent Mode**: Suppress all console output for CI/CD pipelines and automated workflows
 - **Version Catalog Support**: Full support for Gradle Version Catalogs with version references (`libs.versions.toml`)
 - **Plugin Support**: Detects plugins in `plugins` blocks, `apply plugin`, and Version Catalog references
 - **Multiple Declaration Formats**: Supports string format, map format, and libs.xxx format declarations
@@ -79,6 +81,37 @@ gradle-dependency-health-checker conflicts \
   --min-version-conflicts 5
 ```
 
+### JSON Output
+```bash
+# Output results to JSON file instead of console
+gradle-dependency-health-checker --output analysis.json
+
+# Output specific analysis to JSON
+gradle-dependency-health-checker conflicts --output conflicts.json
+gradle-dependency-health-checker dependencies --output deps.json
+gradle-dependency-health-checker bundles --output bundles.json
+
+# Combine with other options
+gradle-dependency-health-checker all \
+  --path ./my-project \
+  --output results.json \
+  --min-version-conflicts 3
+```
+
+### Silent Mode
+```bash
+# Generate JSON file without console output (useful for CI/CD)
+gradle-dependency-health-checker --output analysis.json --silent
+
+# Completely silent execution (no output at all)
+gradle-dependency-health-checker --path ./my-project --silent
+
+# Silent mode with subcommands
+gradle-dependency-health-checker conflicts \
+  --output conflicts.json \
+  --silent
+```
+
 ### Available Commands
 
 | Command | Description | Available Options |
@@ -96,6 +129,8 @@ gradle-dependency-health-checker conflicts \
 | Option | Default | Description |
 |--------|---------|-------------|
 | `--path` | `.` | Path to the Gradle project to analyze |
+| `--output` | *none* | Output results to JSON file instead of console |
+| `--silent` | `false` | Suppress all output messages (useful with --output) |
 
 ### Threshold Options (defaults)
 
@@ -155,6 +190,89 @@ gradle-dependency-health-checker conflicts \
      ├─ feature1/build.gradle
      └─ feature2/build.gradle
    💭 Consider creating a shared module: networking-bundle
+```
+
+### JSON Output Format
+```json
+{
+  "duplicate_analysis": {
+    "regular_duplicates": {
+      "com.squareup.retrofit2:retrofit": [
+        {
+          "dependency": {
+            "group": "com.squareup.retrofit2",
+            "artifact": "retrofit",
+            "version": "2.9.0"
+          },
+          "file_path": "app/build.gradle",
+          "line_number": 15,
+          "configuration": "implementation",
+          "source_type": "Direct"
+        }
+      ]
+    },
+    "version_conflicts": {
+      "com.squareup.okhttp3:okhttp": [
+        {
+          "dependency": {
+            "group": "com.squareup.okhttp3",
+            "artifact": "okhttp",
+            "version": "4.12.0"
+          },
+          "file_path": "app/build.gradle",
+          "line_number": 12,
+          "configuration": "implementation",
+          "source_type": "Direct"
+        },
+        {
+          "dependency": {
+            "group": "com.squareup.okhttp3",
+            "artifact": "okhttp", 
+            "version": "4.10.0"
+          },
+          "file_path": "feature/build.gradle",
+          "line_number": 8,
+          "configuration": "implementation",
+          "source_type": "Direct"
+        }
+      ]
+    }
+  },
+  "plugin_analysis": {
+    "duplicate_plugins": {
+      "java": [
+        {
+          "plugin": {
+            "id": "java",
+            "version": null
+          },
+          "file_path": "app/build.gradle",
+          "line_number": 3,
+          "source_type": "PluginsBlock"
+        }
+      ]
+    }
+  },
+  "bundle_analysis": {
+    "recommended_bundles": [
+      {
+        "dependencies": [
+          "com.squareup.retrofit2:retrofit",
+          "com.squareup.okhttp3:okhttp"
+        ],
+        "modules": [
+          "app/build.gradle",
+          "feature/build.gradle"
+        ],
+        "bundle_size": 2,
+        "module_count": 2,
+        "configurations": ["implementation"],
+        "priority_score": 0.8
+      }
+    ],
+    "total_bundles_found": 5
+  }
+}
 ```
 
 ## 🔧 Supported Gradle File Formats
@@ -225,6 +343,7 @@ application = { id = "application" }
 
 - **Fast Analysis**: Multi-threaded file scanning for quick processing of large projects
 - **Selective Execution**: Run only the analyses you need with targeted subcommands for improved performance
+- **Automation-Friendly**: JSON output and silent mode for seamless CI/CD integration
 - **Accurate Parsing**: Regex-based precise dependency parsing
 - **Smart Bundling**: Intelligent bundle recommendations based on priority scoring
 - **Version Reference Resolution**: Automatically resolves `version.ref` references in Version Catalogs

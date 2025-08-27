@@ -15,6 +15,7 @@ fn test_valid_all_command() {
     let args = Args {
         path: std::path::PathBuf::from("."),
         output: None,
+        silent: false,
         command: Some(Commands::All {
             min_version_conflicts: Some(2),
             min_duplicate_dependencies: Some(3),
@@ -34,6 +35,7 @@ fn test_invalid_version_conflicts_threshold() {
     let args = Args {
         path: std::path::PathBuf::from("."),
         output: None,
+        silent: false,
         command: Some(Commands::Conflicts {
             min_version_conflicts: Some(1),
         }),
@@ -50,6 +52,7 @@ fn test_invalid_duplicate_dependencies_threshold() {
     let args = Args {
         path: std::path::PathBuf::from("."),
         output: None,
+        silent: false,
         command: Some(Commands::Dependencies {
             min_duplicate_dependencies: Some(0),
         }),
@@ -66,6 +69,7 @@ fn test_invalid_duplicate_plugins_threshold() {
     let args = Args {
         path: std::path::PathBuf::from("."),
         output: None,
+        silent: false,
         command: Some(Commands::Plugins {
             min_duplicate_plugins: Some(1),
         }),
@@ -83,6 +87,7 @@ fn test_parse_args_defaults() {
     assert_eq!(args.path, std::path::PathBuf::from("."));
     assert!(args.command.is_none());
     assert!(args.output.is_none());
+    assert!(!args.silent);
 }
 
 #[test]
@@ -151,6 +156,7 @@ fn test_default_behavior_validation() {
     let args = Args {
         path: std::path::PathBuf::from("."),
         output: None,
+        silent: false,
         command: None,
     };
     
@@ -187,4 +193,26 @@ fn test_parse_output_with_subcommand() {
         },
         _ => panic!("Expected Conflicts command"),
     }
+}
+
+#[test]
+fn test_parse_silent_option() {
+    let args = Args::try_parse_from(&[
+        "program",
+        "--silent"
+    ]).unwrap();
+    
+    assert!(args.silent);
+}
+
+#[test]
+fn test_parse_silent_with_output() {
+    let args = Args::try_parse_from(&[
+        "program",
+        "--output", "results.json",
+        "--silent"
+    ]).unwrap();
+    
+    assert_eq!(args.output, Some(std::path::PathBuf::from("results.json")));
+    assert!(args.silent);
 }

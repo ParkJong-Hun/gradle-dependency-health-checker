@@ -298,3 +298,68 @@ dependencies {
     // Parse JSON to ensure it's valid
     let _: serde_json::Value = serde_json::from_str(&json_content).unwrap();
 }
+
+#[test]
+fn test_silent_mode_with_output() {
+    let temp_dir = tempdir().unwrap();
+    
+    // Create test build files
+    create_test_build_gradle(temp_dir.path(), "build.gradle", r#"
+dependencies {
+    implementation 'com.squareup.okhttp3:okhttp:4.10.0'
+}
+"#);
+    
+    // Create output file path
+    let output_file = temp_dir.path().join("silent.json");
+    
+    let mut cmd = Command::cargo_bin("gradle-dependency-health-checker").unwrap();
+    cmd.arg("--path").arg(temp_dir.path())
+       .arg("--output").arg(&output_file)
+       .arg("--silent");
+    
+    let output = cmd.assert().success();
+    let stdout = std::str::from_utf8(&output.get_output().stdout).unwrap();
+    let stderr = std::str::from_utf8(&output.get_output().stderr).unwrap();
+    
+    // In silent mode, there should be no output
+    assert_eq!(stdout.trim(), "");
+    assert_eq!(stderr.trim(), "");
+    
+    // But JSON file should still be created
+    assert!(output_file.exists());
+    let json_content = fs::read_to_string(&output_file).unwrap();
+    let _: serde_json::Value = serde_json::from_str(&json_content).unwrap();
+}
+
+#[test]
+fn test_silent_mode_without_output() {
+    let temp_dir = tempdir().unwrap();
+    
+    // Create test build files with conflicts
+    let app_build_gradle = r#"
+dependencies {
+    implementation 'com.squareup.okhttp3:okhttp:4.10.0'
+}
+"#;
+    create_test_build_gradle(temp_dir.path(), "app/build.gradle", app_build_gradle);
+    
+    let lib_build_gradle = r#"
+dependencies {
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+}
+"#;
+    create_test_build_gradle(temp_dir.path(), "lib/build.gradle", lib_build_gradle);
+    
+    let mut cmd = Command::cargo_bin("gradle-dependency-health-checker").unwrap();
+    cmd.arg("--path").arg(temp_dir.path())
+       .arg("--silent");
+    
+    let output = cmd.assert().success();
+    let stdout = std::str::from_utf8(&output.get_output().stdout).unwrap();
+    let stderr = std::str::from_utf8(&output.get_output().stderr).unwrap();
+    
+    // In silent mode without output file, there should be no output at all
+    assert_eq!(stdout.trim(), "");
+    assert_eq!(stderr.trim(), "");
+}

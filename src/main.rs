@@ -29,7 +29,9 @@ fn main() {
     
     // Validate threshold arguments
     if let Err(error) = validate_args(&args, &config) {
-        eprintln!("❌ Error: {}", error);
+        if !args.silent {
+            eprintln!("❌ Error: {}", error);
+        }
         std::process::exit(1);
     }
     
@@ -40,16 +42,25 @@ fn main() {
             // Handle output based on whether file output is requested
             if let Some(output_path) = &args.output {
                 if let Err(e) = write_analysis_to_file(&analysis, output_path) {
-                    eprintln!("❌ Error writing to file: {}", e);
+                    if !args.silent {
+                        eprintln!("❌ Error writing to file: {}", e);
+                    }
                     std::process::exit(1);
                 }
-                println!("✅ Analysis results written to: {}", output_path.display());
+                if !args.silent {
+                    println!("✅ Analysis results written to: {}", output_path.display());
+                }
             } else {
-                print_analysis_to_console(&analysis, &options);
+                // In silent mode without output file, don't print anything
+                if !args.silent {
+                    print_analysis_to_console(&analysis, &options);
+                }
             }
         }
         Err(e) => {
-            eprintln!("❌ Error: {}", e);
+            if !args.silent {
+                eprintln!("❌ Error: {}", e);
+            }
             std::process::exit(1);
         }
     }
