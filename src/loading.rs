@@ -73,6 +73,7 @@ impl Drop for LoadingSpinner {
 pub struct ProgressBar {
     running: Arc<AtomicBool>,
     handle: Option<thread::JoinHandle<()>>,
+    #[allow(dead_code)]
     message: String,
 }
 
@@ -136,6 +137,7 @@ impl Drop for ProgressBar {
 }
 
 /// Simple loading indicator for file operations
+#[allow(dead_code)]
 pub fn with_loading<F, R>(message: &str, operation: F) -> R
 where 
     F: FnOnce() -> R,
@@ -147,6 +149,7 @@ where
 }
 
 /// Progress indicator with success/error handling
+#[allow(dead_code)]
 pub fn with_progress<F, R, E>(message: &str, operation: F) -> Result<R, E>
 where 
     F: FnOnce() -> Result<R, E>,

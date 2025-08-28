@@ -20,6 +20,7 @@ A comprehensive tool to analyze Gradle projects for dependency issues, version c
 ### Output & Integration
 - **Flexible Subcommands**: Run specific analyses with targeted commands
 - **JSON Output**: Export detailed analysis results to structured JSON files
+- **Filtered JSON Output**: JSON output includes only relevant sections based on the subcommand used
 - **Silent Mode**: Perfect for CI/CD pipelines and automated workflows
 - **Rich Console Output**: Color-coded emoji-rich output for developers
 
@@ -57,8 +58,13 @@ gradle-dependency-health-checker bundles
 
 ### Output Options
 ```bash
-# Output to JSON file
+# Output to JSON file (includes all analysis sections)
 gradle-dependency-health-checker --output analysis.json
+
+# Output specific analysis to JSON file (filtered content)
+gradle-dependency-health-checker conflicts --output conflicts.json
+gradle-dependency-health-checker dependencies --output deps.json
+gradle-dependency-health-checker bundles --output bundles.json
 
 # Silent mode (no console output)
 gradle-dependency-health-checker --output analysis.json --silent

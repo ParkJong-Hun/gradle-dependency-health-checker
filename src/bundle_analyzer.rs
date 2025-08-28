@@ -21,7 +21,7 @@ pub struct DependencyBundle {
     pub priority_score: f64,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct BundleAnalysis {
     pub recommended_bundles: Vec<DependencyBundle>,
     pub total_bundles_found: usize,

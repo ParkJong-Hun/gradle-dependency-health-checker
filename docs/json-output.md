@@ -7,10 +7,12 @@
 # Output results to JSON file instead of console
 gradle-dependency-health-checker --output analysis.json
 
-# Output specific analysis to JSON
-gradle-dependency-health-checker conflicts --output conflicts.json
-gradle-dependency-health-checker dependencies --output deps.json
-gradle-dependency-health-checker bundles --output bundles.json
+# Output specific analysis to JSON (JSON will only contain relevant sections)
+gradle-dependency-health-checker conflicts --output conflicts.json      # Only version_conflicts
+gradle-dependency-health-checker dependencies --output deps.json        # Only regular_duplicates
+gradle-dependency-health-checker plugins --output plugins.json          # Only plugin_analysis
+gradle-dependency-health-checker bundles --output bundles.json          # Only bundle_analysis
+gradle-dependency-health-checker duplicates --output duplicates.json    # Dependencies + Plugins
 
 # Combine with other options
 gradle-dependency-health-checker all \
@@ -35,9 +37,18 @@ gradle-dependency-health-checker conflicts \
 
 ## JSON Structure
 
-The JSON output contains three main sections:
+The JSON output structure varies based on the subcommand used. Each subcommand includes only the relevant data sections:
 
-### Complete Structure Overview
+### Subcommand-Specific Output
+
+- **`conflicts`**: Only includes `duplicate_analysis` with `version_conflicts` (regular_duplicates will be empty)
+- **`dependencies`**: Only includes `duplicate_analysis` with `regular_duplicates` (version_conflicts will be empty)
+- **`plugins`**: Only includes `plugin_analysis`
+- **`bundles`**: Only includes `bundle_analysis`
+- **`duplicates`**: Includes both `duplicate_analysis` and `plugin_analysis`
+- **`all`** or no subcommand: Includes all three sections
+
+### Complete Structure Overview (all/default)
 ```json
 {
   "duplicate_analysis": {
@@ -47,6 +58,47 @@ The JSON output contains three main sections:
   "plugin_analysis": {
     "duplicate_plugins": { ... }
   },
+  "bundle_analysis": {
+    "recommended_bundles": [ ... ],
+    "total_bundles_found": 8
+  }
+}
+```
+
+### Filtered Structure Examples
+
+#### `conflicts` subcommand output:
+```json
+{
+  "duplicate_analysis": {
+    "regular_duplicates": {},
+    "version_conflicts": { ... }
+  }
+}
+```
+
+#### `dependencies` subcommand output:
+```json
+{
+  "duplicate_analysis": {
+    "regular_duplicates": { ... },
+    "version_conflicts": {}
+  }
+}
+```
+
+#### `plugins` subcommand output:
+```json
+{
+  "plugin_analysis": {
+    "duplicate_plugins": { ... }
+  }
+}
+```
+
+#### `bundles` subcommand output:
+```json
+{
   "bundle_analysis": {
     "recommended_bundles": [ ... ],
     "total_bundles_found": 8
@@ -316,21 +368,55 @@ import json
 with open('analysis.json', 'r') as f:
     data = json.load(f)
 
-# Process version conflicts
-for artifact, conflicts in data['duplicate_analysis']['version_conflicts'].items():
-    print(f"Conflict in {artifact}:")
-    for conflict in conflicts:
-        print(f"  - {conflict['file_path']}:{conflict['line_number']} = {conflict['dependency']['version']}")
+# Check which sections are present (depends on subcommand used)
+if 'duplicate_analysis' in data:
+    # Process version conflicts (only present if conflicts/all/duplicates command was used)
+    if data['duplicate_analysis']['version_conflicts']:
+        for artifact, conflicts in data['duplicate_analysis']['version_conflicts'].items():
+            print(f"Conflict in {artifact}:")
+            for conflict in conflicts:
+                print(f"  - {conflict['file_path']}:{conflict['line_number']} = {conflict['dependency']['version']}")
+    
+    # Process regular duplicates (only present if dependencies/all/duplicates command was used)
+    if data['duplicate_analysis']['regular_duplicates']:
+        for artifact, duplicates in data['duplicate_analysis']['regular_duplicates'].items():
+            print(f"Duplicate dependency: {artifact} found in {len(duplicates)} locations")
+
+if 'plugin_analysis' in data:
+    # Process plugin duplicates (only present if plugins/all/duplicates command was used)
+    for plugin_id, duplicates in data['plugin_analysis']['duplicate_plugins'].items():
+        print(f"Duplicate plugin: {plugin_id} found in {len(duplicates)} locations")
+
+if 'bundle_analysis' in data:
+    # Process bundle recommendations (only present if bundles/all command was used)
+    print(f"Found {data['bundle_analysis']['total_bundles_found']} potential bundles")
+    for bundle in data['bundle_analysis']['recommended_bundles']:
+        print(f"Bundle: {len(bundle['dependencies'])} deps in {bundle['module_count']} modules")
 ```
 
 ### Shell Script Processing
 ```bash
-# Extract bundle recommendations count
-BUNDLE_COUNT=$(cat analysis.json | jq '.bundle_analysis.total_bundles_found')
+# Check if sections exist before processing (depends on subcommand used)
 
-# List all conflicted artifacts
-cat analysis.json | jq -r '.duplicate_analysis.version_conflicts | keys[]'
+# Extract bundle recommendations count (only if bundles/all command was used)
+if [[ $(cat analysis.json | jq 'has("bundle_analysis")') == "true" ]]; then
+  BUNDLE_COUNT=$(cat analysis.json | jq '.bundle_analysis.total_bundles_found')
+  echo "Found $BUNDLE_COUNT bundles"
+fi
 
-# Get high-priority bundles (score > 50)
-cat analysis.json | jq '.bundle_analysis.recommended_bundles[] | select(.priority_score > 50)'
+# List all conflicted artifacts (only if conflicts/all/duplicates command was used)
+if [[ $(cat analysis.json | jq 'has("duplicate_analysis")') == "true" ]]; then
+  cat analysis.json | jq -r '.duplicate_analysis.version_conflicts | keys[]'
+fi
+
+# Get high-priority bundles (score > 50) - only if bundles/all command was used
+if [[ $(cat analysis.json | jq 'has("bundle_analysis")') == "true" ]]; then
+  cat analysis.json | jq '.bundle_analysis.recommended_bundles[] | select(.priority_score > 50)'
+fi
+
+# Count plugin duplicates (only if plugins/all/duplicates command was used)
+if [[ $(cat analysis.json | jq 'has("plugin_analysis")') == "true" ]]; then
+  PLUGIN_COUNT=$(cat analysis.json | jq '.plugin_analysis.duplicate_plugins | length')
+  echo "Found $PLUGIN_COUNT duplicate plugins"
+fi
 ```

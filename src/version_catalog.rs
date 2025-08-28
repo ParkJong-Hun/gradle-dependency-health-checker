@@ -24,6 +24,7 @@ pub struct VersionCatalog {
 pub struct LibraryDefinition {
     pub group: Option<String>,
     pub name: Option<String>,
+    pub module: Option<String>,
     pub version: Option<VersionRef>,
     #[serde(rename = "version.ref")]
     pub version_ref: Option<String>,
@@ -80,20 +81,51 @@ impl VersionCatalog {
             // Gradle converts dots to dashes in library names for lookup
             // e.g. libs.kotlinx.coroutines.core -> kotlinx-coroutines-core
             let dash_name = library_name.replace('.', "-");
-            libraries.get(&dash_name)?
+            if let Some(def) = libraries.get(&dash_name) {
+                def
+            } else {
+                return None;
+            }
         };
         
-        let group = library_def.group.as_ref()?.clone();
-        let name = library_def.name.as_ref()?.clone();
+        let (group, name) = if let Some(module) = &library_def.module {
+            // If module is specified, it overrides group and name
+            let parts: Vec<&str> = module.split(':').collect();
+            if parts.len() == 2 {
+                (parts[0].to_string(), parts[1].to_string())
+            } else {
+                return None;
+            }
+        } else if let (Some(g), Some(n)) = (&library_def.group, &library_def.name) {
+            (g.clone(), n.clone())
+        } else {
+            return None;
+        };
         
         // Try to get version from version_ref first, then from version field
         let version = if let Some(version_ref) = &library_def.version_ref {
-            self.versions.as_ref()?.get(version_ref)?.clone()
+            if let Some(versions) = self.versions.as_ref() {
+                if let Some(v) = versions.get(version_ref) {
+                    v.clone()
+                } else {
+                    return None;
+                }
+            } else {
+                return None;
+            }
         } else if let Some(version) = &library_def.version {
             match version {
                 VersionRef::Direct(v) => v.clone(),
                 VersionRef::Reference { r#ref } => {
-                    self.versions.as_ref()?.get(r#ref)?.clone()
+                    if let Some(versions) = self.versions.as_ref() {
+                        if let Some(v) = versions.get(r#ref) {
+                            v.clone()
+                        } else {
+                            return None;
+                        }
+                    } else {
+                        return None;
+                    }
                 }
             }
         } else {

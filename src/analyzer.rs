@@ -12,13 +12,13 @@ use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct DuplicateAnalysis {
     pub regular_duplicates: HashMap<String, Vec<DependencyLocation>>,
     pub version_conflicts: HashMap<String, Vec<DependencyLocation>>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct PluginAnalysis {
     pub duplicate_plugins: HashMap<String, Vec<PluginLocation>>,
 }
@@ -135,10 +135,14 @@ fn analyze_dependency_group(locations: &[&DependencyLocation]) -> Option<(bool, 
         }
     }
     
-    // Only consider it if it appears in different files
-    if unique_files.len() > 1 {
-        let locations_owned: Vec<DependencyLocation> = locations.iter().map(|&loc| loc.clone()).collect();
-        let is_version_conflict = unique_versions.len() > 1;
+    // Consider duplicates in same file OR different files
+    // Same file duplicates are also important
+    let locations_owned: Vec<DependencyLocation> = locations.iter().map(|&loc| loc.clone()).collect();
+    let is_version_conflict = unique_versions.len() > 1;
+
+    // If multple files, it's definitely a duplicate
+    // If same file but multiple occurrences, also a duplicate
+    if unique_files.len() > 1 || locations.len() > 1 {
         Some((is_version_conflict, locations_owned))
     } else {
         None
@@ -158,16 +162,10 @@ fn analyze_plugins(all_plugins: &[PluginLocation]) -> PluginAnalysis {
     
     for (plugin_id, locations) in plugin_groups {
         if locations.len() > 1 {
-            // Check if plugins appear in different files
-            let mut unique_files = HashSet::new();
-            for location in &locations {
-                unique_files.insert(&location.file_path);
-            }
-            
-            if unique_files.len() > 1 {
-                let locations_owned: Vec<PluginLocation> = locations.iter().map(|&loc| loc.clone()).collect();
-                duplicate_plugins.insert(plugin_id, locations_owned);
-            }
+            // Consider duplicates in same file OR different files
+            // Same file duplicates are also important
+            let locations_owned: Vec<PluginLocation> = locations.iter().map(|&loc| loc.clone()).collect();
+            duplicate_plugins.insert(plugin_id, locations_owned);
         }
     }
     

@@ -17,10 +17,12 @@ mod loading;
 
 use clap::Parser;
 use colored::*;
-use cli::{Args, validate_args, AnalysisOptions};
+use cli::{Args, validate_args, AnalysisOptions, Commands};
 use config::Config;
-use analyzer::{perform_complete_analysis, CompleteAnalysis};
+use analyzer::{perform_complete_analysis, CompleteAnalysis, DuplicateAnalysis, PluginAnalysis};
+use bundle_analyzer::BundleAnalysis;
 use display::{print_version_conflicts, print_regular_duplicates, print_bundle_recommendations, print_duplicate_plugins};
+use serde::Serialize;
 use loading::{ProgressBar, LoadingSpinner};
 use std::fs;
 use std::io::Write;
@@ -57,10 +59,10 @@ fn main() {
             // Handle output based on whether file output is requested
             if let Some(output_path) = &args.output {
                 let write_result = if args.silent {
-                    write_analysis_to_file(&analysis, output_path)
+                    write_analysis_to_file(&analysis, output_path, &args.command)
                 } else {
                     let mut spinner = LoadingSpinner::new("Writing results to file");
-                    let result = write_analysis_to_file(&analysis, output_path);
+                    let result = write_analysis_to_file(&analysis, output_path, &args.command);
                     match &result {
                         Ok(_) => spinner.finish_with_message(&format!("✅ Analysis results written to: {}", output_path.display())),
                         Err(_) => spinner.finish(),
@@ -74,11 +76,11 @@ fn main() {
                     }
                     std::process::exit(1);
                 }
-            } else {
-                // In silent mode without output file, don't print anything
-                if !args.silent {
-                    print_analysis_to_console(&analysis, &options);
-                }
+            }
+            
+            // Show console output unless in silent mode
+            if !args.silent {
+                print_analysis_to_console(&analysis, &options);
             }
         }
         Err(e) => {
@@ -90,20 +92,84 @@ fn main() {
     }
 }
 
-fn write_analysis_to_file(analysis: &CompleteAnalysis, output_path: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
-    let json_output = serde_json::to_string_pretty(analysis)?;
+fn write_analysis_to_file(analysis: &CompleteAnalysis, output_path: &std::path::Path, command: &Option<Commands>) -> Result<(), Box<dyn std::error::Error>> {
+    let filtered_analysis = create_filtered_analysis(analysis, command);
+    let json_output = serde_json::to_string_pretty(&filtered_analysis)?;
     let mut file = fs::File::create(output_path)?;
     file.write_all(json_output.as_bytes())?;
     Ok(())
 }
 
+#[derive(Serialize)]
+struct FilteredAnalysis {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    duplicate_analysis: Option<DuplicateAnalysis>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    plugin_analysis: Option<PluginAnalysis>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    bundle_analysis: Option<BundleAnalysis>,
+}
+
+fn create_filtered_analysis(analysis: &CompleteAnalysis, command: &Option<Commands>) -> FilteredAnalysis {
+    use std::collections::HashMap;
+    
+    match command {
+        Some(Commands::Conflicts { .. }) => {
+            FilteredAnalysis {
+                duplicate_analysis: Some(DuplicateAnalysis {
+                    regular_duplicates: HashMap::new(),
+                    version_conflicts: analysis.duplicate_analysis.version_conflicts.clone(),
+                }),
+                plugin_analysis: None,
+                bundle_analysis: None,
+            }
+        }
+        Some(Commands::Dependencies { .. }) => {
+            FilteredAnalysis {
+                duplicate_analysis: Some(DuplicateAnalysis {
+                    regular_duplicates: analysis.duplicate_analysis.regular_duplicates.clone(),
+                    version_conflicts: HashMap::new(),
+                }),
+                plugin_analysis: None,
+                bundle_analysis: None,
+            }
+        }
+        Some(Commands::Plugins { .. }) => {
+            FilteredAnalysis {
+                duplicate_analysis: None,
+                plugin_analysis: Some(analysis.plugin_analysis.clone()),
+                bundle_analysis: None,
+            }
+        }
+        Some(Commands::Duplicates { .. }) => {
+            FilteredAnalysis {
+                duplicate_analysis: Some(analysis.duplicate_analysis.clone()),
+                plugin_analysis: Some(analysis.plugin_analysis.clone()),
+                bundle_analysis: None,
+            }
+        }
+        Some(Commands::Bundles { .. }) => {
+            FilteredAnalysis {
+                duplicate_analysis: None,
+                plugin_analysis: None,
+                bundle_analysis: Some(analysis.bundle_analysis.clone()),
+            }
+        }
+        Some(Commands::All { .. }) | None => {
+            // For "all" command or no command (default), include everything
+            FilteredAnalysis {
+                duplicate_analysis: Some(analysis.duplicate_analysis.clone()),
+                plugin_analysis: Some(analysis.plugin_analysis.clone()),
+                bundle_analysis: Some(analysis.bundle_analysis.clone()),
+            }
+        }
+    }
+}
+
 fn print_analysis_to_console(analysis: &CompleteAnalysis, options: &AnalysisOptions) {
     let version_conflicts_count = analysis.duplicate_analysis.version_conflicts.len();
     let duplicate_dependencies_count = analysis.duplicate_analysis.regular_duplicates.len();
-    let duplicate_plugins_count = analysis.plugin_analysis.duplicate_plugins
-        .iter()
-        .map(|(_, locations)| locations.len())
-        .sum::<usize>();
+    let duplicate_plugins_count = analysis.plugin_analysis.duplicate_plugins.len();
     let bundle_recommendations_count = analysis.bundle_analysis.recommended_bundles.len();
     
     let show_version_conflicts = version_conflicts_count >= options.min_version_conflicts;

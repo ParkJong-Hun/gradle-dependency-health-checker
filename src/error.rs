@@ -19,6 +19,7 @@ pub enum AnalysisError {
     /// Validation errors for CLI arguments
     Validation(String),
     /// General parsing errors
+    #[allow(dead_code)]
     Parsing(String),
     /// File system errors
     FileSystem(String),

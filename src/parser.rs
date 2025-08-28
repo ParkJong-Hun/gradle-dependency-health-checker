@@ -364,7 +364,7 @@ fn parse_string_dependency(
         let configuration = captures[1].to_string();
         let group = captures[2].to_string();
         let artifact = captures[3].to_string();
-        let version = Some(captures[4].to_string());
+        let version = captures.get(4).map(|m| m.as_str().to_string());
         
         Ok(Some(create_dependency_location(
             group,
