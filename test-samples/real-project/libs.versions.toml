@@ -1,0 +1,14 @@
+[versions]
+kotlinx-serialization = "1.6.2"
+kotlinx-datetime = "0.5.0"
+kotlinx-collections-immutable = "0.3.6"
+androidx-appcompat = "1.6.1"
+material3 = "1.1.2"
+
+[libraries]
+kotlinxSerializationJson = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
+kotlinxDatetime = { group = "org.jetbrains.kotlinx", name = "kotlinx-datetime", version.ref = "kotlinx-datetime" }
+kotlinxCollectionsImmutable = { group = "org.jetbrains.kotlinx", name = "kotlinx-collections-immutable", version.ref = "kotlinx-collections-immutable" }
+soilQueryCore = { group = "soil.query", name = "soil-query-core", version = "1.0.0" }
+androidxAppCompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "androidx-appcompat" }
+material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "material3" }

@@ -72,7 +72,16 @@ pub fn parse_version_catalog(file_path: &Path) -> Result<VersionCatalog> {
 impl VersionCatalog {
     pub fn resolve_library_version(&self, library_name: &str) -> Option<(String, String, String)> {
         let libraries = self.libraries.as_ref()?;
-        let library_def = libraries.get(library_name)?;
+        
+        // Try exact match first
+        let library_def = if let Some(def) = libraries.get(library_name) {
+            def
+        } else {
+            // Gradle converts dots to dashes in library names for lookup
+            // e.g. libs.kotlinx.coroutines.core -> kotlinx-coroutines-core
+            let dash_name = library_name.replace('.', "-");
+            libraries.get(&dash_name)?
+        };
         
         let group = library_def.group.as_ref()?.clone();
         let name = library_def.name.as_ref()?.clone();

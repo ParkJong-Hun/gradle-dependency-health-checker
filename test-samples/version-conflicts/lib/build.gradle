@@ -1,0 +1,5 @@
+dependencies {
+    implementation "com.google.code.gson:gson:2.8.9"  // Different version
+    api "io.ktor:ktor-client-core:2.3.5"  // Same version
+    implementation "androidx.core:core-ktx:1.12.0"
+}

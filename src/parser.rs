@@ -63,6 +63,9 @@ struct DependencyPatterns {
     map_dep_group_first: Regex,
     map_dep_name_first: Regex,
     libs_dep: Regex,
+    version_catalog_dep: Regex,
+    project_dep: Regex,
+    projects_accessor_dep: Regex,
 }
 
 struct PluginPatterns {
@@ -83,6 +86,9 @@ fn create_dependency_patterns() -> Result<DependencyPatterns> {
         map_dep_group_first: Regex::new(regex_patterns::MAP_DEPENDENCY_1)?,
         map_dep_name_first: Regex::new(regex_patterns::MAP_DEPENDENCY_2)?,
         libs_dep: Regex::new(regex_patterns::LIBS_DEPENDENCY)?,
+        version_catalog_dep: Regex::new(regex_patterns::VERSION_CATALOG_DEPENDENCY)?,
+        project_dep: Regex::new(regex_patterns::PROJECT_DEPENDENCY)?,
+        projects_accessor_dep: Regex::new(regex_patterns::PROJECTS_ACCESSOR_DEPENDENCY)?,
     })
 }
 
@@ -197,42 +203,134 @@ pub fn parse_dependencies_from_file(
 ) -> Result<Vec<DependencyLocation>> {
     let content = fs::read_to_string(file_path)?;
     let mut dependencies = Vec::new();
-    let mut in_dependencies_block = false;
-    let mut brace_count = 0;
     
     let patterns = create_dependency_patterns()?;
+    
+    #[derive(Debug)]
+    enum ParserState {
+        Normal,
+        InKotlin(i32), // brace count for kotlin block
+        InSourceSets(i32), // brace count for sourceSets block  
+        InSourceSet(String, i32), // source set name, brace count for this sourceSet
+        InDependencies(String, i32), // source set name, brace count for dependencies block
+    }
+    
+    let mut state = ParserState::Normal;
     
     for (line_number, line) in content.lines().enumerate() {
         let trimmed_line = line.trim();
         
-        // Check if we're entering a dependencies block
-        if trimmed_line.starts_with(regex_patterns::DEPENDENCIES_BLOCK) && trimmed_line.contains('{') {
-            in_dependencies_block = true;
-            brace_count = 1;
-            continue;
-        }
-        
-        if in_dependencies_block {
-            // Count braces to track nested blocks
-            brace_count += trimmed_line.matches('{').count();
-            brace_count -= trimmed_line.matches('}').count();
-            
-            if brace_count == 0 {
-                in_dependencies_block = false;
-                continue;
+        state = match state {
+            ParserState::Normal => {
+                if trimmed_line.starts_with("kotlin") && trimmed_line.contains('{') {
+                    ParserState::InKotlin(1)
+                } else if trimmed_line.starts_with("sourceSets") && trimmed_line.contains('{') {
+                    ParserState::InSourceSets(1)
+                } else if trimmed_line.starts_with(regex_patterns::DEPENDENCIES_BLOCK) && trimmed_line.contains('{') {
+                    ParserState::InDependencies("main".to_string(), 1)
+                } else {
+                    ParserState::Normal
+                }
             }
             
-            // Parse different dependency formats
-            if let Some(dep) = parse_string_dependency(&patterns.string_dep, trimmed_line, file_path, line_number + 1)? {
-                dependencies.push(dep);
-            } else if let Some(dep) = parse_map_dependency_group_first(&patterns.map_dep_group_first, trimmed_line, file_path, line_number + 1)? {
-                dependencies.push(dep);
-            } else if let Some(dep) = parse_map_dependency_name_first(&patterns.map_dep_name_first, trimmed_line, file_path, line_number + 1)? {
-                dependencies.push(dep);
-            } else if let Some(dep) = parse_libs_dependency(&patterns.libs_dep, trimmed_line, file_path, line_number + 1, version_catalogs)? {
-                dependencies.push(dep);
+            ParserState::InKotlin(mut brace_count) => {
+                brace_count += trimmed_line.matches('{').count() as i32;
+                brace_count -= trimmed_line.matches('}').count() as i32;
+                
+                if brace_count == 0 {
+                    ParserState::Normal
+                } else if trimmed_line.starts_with("sourceSets") && trimmed_line.contains('{') {
+                    ParserState::InSourceSets(1)
+                } else {
+                    ParserState::InKotlin(brace_count)
+                }
             }
-        }
+            
+            ParserState::InSourceSets(mut brace_count) => {
+                brace_count += trimmed_line.matches('{').count() as i32;
+                brace_count -= trimmed_line.matches('}').count() as i32;
+                
+                if brace_count == 0 {
+                    ParserState::Normal
+                } else if let Some(source_set_name) = extract_source_set_dependencies(trimmed_line) {
+                    // Pattern: commonMain.dependencies {
+                    ParserState::InDependencies(source_set_name, 1)
+                } else if let Some(source_set_name) = extract_source_set_block(trimmed_line) {
+                    // Pattern: commonMain {
+                    ParserState::InSourceSet(source_set_name, 1)
+                } else {
+                    ParserState::InSourceSets(brace_count)
+                }
+            }
+            
+            ParserState::InSourceSet(source_set_name, mut brace_count) => {
+                if trimmed_line.starts_with(regex_patterns::DEPENDENCIES_BLOCK) && trimmed_line.contains('{') {
+                    // Found dependencies { inside this sourceSet - don't update brace_count for the sourceSet
+                    ParserState::InDependencies(source_set_name, 1)
+                } else {
+                    brace_count += trimmed_line.matches('{').count() as i32;
+                    brace_count -= trimmed_line.matches('}').count() as i32;
+                    
+                    if brace_count == 0 {
+                        // Exited this sourceSet, back to sourceSets level
+                        ParserState::InSourceSets(1)
+                    } else {
+                        ParserState::InSourceSet(source_set_name, brace_count)
+                    }
+                }
+            }
+            
+            ParserState::InDependencies(source_set_name, mut brace_count) => {
+                brace_count += trimmed_line.matches('{').count() as i32;
+                brace_count -= trimmed_line.matches('}').count() as i32;
+                
+                if brace_count == 0 {
+                    // Dependencies block ended
+                    if source_set_name == "main" {
+                        ParserState::Normal
+                    } else {
+                        // We were in a sourceSet dependencies block, go back to sourceSets level
+                        // Need to recalculate the sourceSets brace count
+                        ParserState::InSourceSets(1)
+                    }
+                } else {
+                    // Parse dependencies in this block
+                    let source_set_suffix = if source_set_name == "main" {
+                        "".to_string()
+                    } else {
+                        format!("-{}", source_set_name)
+                    };
+                    
+                    // Check if this is a project dependency (should be ignored)
+                    if is_project_dependency(&patterns, trimmed_line) {
+                        // Skip project dependencies - clone source_set_name for next iteration
+                        ParserState::InDependencies(source_set_name.clone(), brace_count)
+                    } else if let Some(mut dep) = parse_string_dependency(&patterns.string_dep, trimmed_line, file_path, line_number + 1)? {
+                        dep.configuration = format!("{}{}", dep.configuration, source_set_suffix);
+                        dependencies.push(dep);
+                        ParserState::InDependencies(source_set_name, brace_count)
+                    } else if let Some(mut dep) = parse_map_dependency_group_first(&patterns.map_dep_group_first, trimmed_line, file_path, line_number + 1)? {
+                        dep.configuration = format!("{}{}", dep.configuration, source_set_suffix);
+                        dependencies.push(dep);
+                        ParserState::InDependencies(source_set_name, brace_count)
+                    } else if let Some(mut dep) = parse_map_dependency_name_first(&patterns.map_dep_name_first, trimmed_line, file_path, line_number + 1)? {
+                        dep.configuration = format!("{}{}", dep.configuration, source_set_suffix);
+                        dependencies.push(dep);
+                        ParserState::InDependencies(source_set_name, brace_count)
+                    } else if let Some(mut dep) = parse_libs_dependency(&patterns.libs_dep, trimmed_line, file_path, line_number + 1, version_catalogs)? {
+                        dep.configuration = format!("{}{}", dep.configuration, source_set_suffix);
+                        dependencies.push(dep);
+                        ParserState::InDependencies(source_set_name, brace_count)
+                    } else if let Some(mut dep) = parse_version_catalog_dependency(&patterns.version_catalog_dep, trimmed_line, file_path, line_number + 1, version_catalogs)? {
+                        dep.configuration = format!("{}{}", dep.configuration, source_set_suffix);
+                        dependencies.push(dep);
+                        ParserState::InDependencies(source_set_name, brace_count)
+                    } else {
+                        ParserState::InDependencies(source_set_name, brace_count)
+                    }
+                }
+            }
+        };
     }
     
     Ok(dependencies)
@@ -332,6 +430,94 @@ fn parse_map_dependency_name_first(
     } else {
         Ok(None)
     }
+}
+
+fn is_project_dependency(patterns: &DependencyPatterns, line: &str) -> bool {
+    patterns.project_dep.is_match(line) || patterns.projects_accessor_dep.is_match(line)
+}
+
+fn extract_source_set_dependencies(line: &str) -> Option<String> {
+    // Match patterns like "commonMain.dependencies {" or "androidMain.dependencies {"
+    let re = regex::Regex::new(r"^\s*([a-zA-Z0-9]+)\.dependencies\s*\{\s*$").ok()?;
+    if let Some(captures) = re.captures(line) {
+        Some(captures[1].to_string())
+    } else {
+        None
+    }
+}
+
+fn extract_source_set_block(line: &str) -> Option<String> {
+    // Match patterns like "commonMain {" or "androidMain {"
+    let re = regex::Regex::new(r"^\s*([a-zA-Z0-9]+)\s*\{\s*$").ok()?;
+    if let Some(captures) = re.captures(line) {
+        let name = captures[1].to_string();
+        // Only match common source set names to avoid false positives
+        if name.ends_with("Main") || name.ends_with("Test") || 
+           name == "common" || name == "android" || name == "ios" || name == "jvm" || name == "js" {
+            Some(name)
+        } else {
+            None
+        }
+    } else {
+        None
+    }
+}
+
+fn parse_version_catalog_dependency(
+    regex: &Regex,
+    line: &str,
+    file_path: &Path,
+    line_number: usize,
+    version_catalogs: &HashMap<PathBuf, VersionCatalog>,
+) -> Result<Option<DependencyLocation>> {
+    if let Some(captures) = regex.captures(line) {
+        let configuration = captures[1].to_string();
+        let catalog_name = captures[2].to_string();
+        let lib_reference = captures[3].to_string();
+        
+        // Skip known non-library catalogs
+        if catalog_name == "projects" {
+            return Ok(None); // This is a projects accessor, not a version catalog
+        }
+        
+        // Try to resolve from version catalogs
+        for catalog in version_catalogs.values() {
+            // For compose.xxx, look for compose-xxx or compose.xxx in catalog
+            let lookup_key = if catalog_name == "compose" {
+                format!("compose-{}", lib_reference.replace('.', "-"))
+            } else {
+                lib_reference.replace('.', "-")
+            };
+            
+            if let Some((group, artifact, version)) = catalog.resolve_library_version(&lookup_key) {
+                return Ok(Some(create_dependency_location(
+                    group,
+                    artifact,
+                    Some(version),
+                    configuration,
+                    file_path,
+                    line_number,
+                    DependencySourceType::VersionCatalog(format!("{}.{}", catalog_name, lib_reference)),
+                )));
+            }
+        }
+        
+        // If not found in catalogs, check if it might be a built-in accessor like compose.runtime
+        if catalog_name == "compose" {
+            // Create a synthetic dependency for compose BOM entries
+            return Ok(Some(create_dependency_location(
+                "org.jetbrains.compose".to_string(),
+                lib_reference.replace('.', "-"),
+                None, // Version managed by compose BOM
+                configuration,
+                file_path,
+                line_number,
+                DependencySourceType::VersionCatalog(format!("{}.{}", catalog_name, lib_reference)),
+            )));
+        }
+    }
+    
+    Ok(None)
 }
 
 fn parse_libs_dependency(

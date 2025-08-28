@@ -2,7 +2,7 @@
 
 ## Overview
 
-This tool supports all major Gradle build file formats and declaration styles used in modern Gradle projects.
+This tool provides comprehensive support for all major Gradle build file formats and declaration styles, with special emphasis on modern Kotlin Multiplatform projects, version catalogs, and advanced dependency management patterns.
 
 ## 1. Groovy Build Scripts (build.gradle)
 
@@ -50,7 +50,7 @@ plugins {
 apply(plugin = "jacoco")
 ```
 
-### Dependency Declarations
+### Standard Dependency Declarations
 ```kotlin
 dependencies {
     // String format
@@ -66,6 +66,67 @@ dependencies {
     api("androidx.core:core-ktx:1.12.0")
     compileOnly("org.projectlombok:lombok:1.18.28")
     kapt("org.projectlombok:lombok:1.18.28")
+}
+```
+
+### Kotlin Multiplatform Dependencies
+```kotlin
+kotlin {
+    androidTarget()
+    ios()
+    jvm()
+    
+    sourceSets {
+        // Direct sourceSet dependencies
+        commonMain.dependencies {
+            implementation(libs.kotlinx.coroutines.core)
+            api(libs.ktor.client.core)
+            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
+        }
+        
+        // Nested sourceSet blocks
+        commonTest {
+            dependencies {
+                implementation(libs.kotlin.test)
+                implementation(libs.kotlinx.coroutines.test)
+            }
+        }
+        
+        androidMain {
+            dependencies {
+                implementation(libs.androidx.core.ktx)
+                implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
+            }
+        }
+        
+        iosMain.dependencies {
+            implementation(libs.ktor.client.darwin)
+        }
+    }
+}
+
+// Traditional dependencies block still supported
+dependencies {
+    commonMainImplementation(libs.kotlinx.datetime)
+    androidMainImplementation(libs.androidx.activity.compose)
+}
+```
+
+### Compose Multiplatform Support
+```kotlin
+kotlin {
+    sourceSets {
+        commonMain.dependencies {
+            // Compose BOM-managed dependencies
+            implementation(compose.runtime)
+            implementation(compose.ui)
+            implementation(compose.foundation)
+            implementation(compose.material3)
+            
+            // Mixed with version catalog
+            implementation(libs.compose.navigation)
+        }
+    }
 }
 ```
 
@@ -112,22 +173,36 @@ application = { id = "application" }
 ## 4. Detection Capabilities
 
 ### Dependency Detection
-- **String format**: `implementation 'group:artifact:version'`
-- **Map format**: `implementation group: 'group', name: 'artifact', version: 'version'`
-- **Version catalog**: `implementation libs.dependency`
+- **String format**: `implementation("group:artifact:version")` / `implementation 'group:artifact:version'`
+- **Map format**: `implementation(group = "group", name = "artifact", version = "version")`
+- **Version catalog**: `implementation(libs.dependency)` with dot-to-dash conversion (`libs.kotlinx.coroutines.core` → `kotlinx-coroutines-core`)
+- **Compose accessors**: `implementation(compose.runtime)`, `implementation(compose.ui)`
 - **All configurations**: `implementation`, `api`, `compileOnly`, `testImplementation`, `kapt`, etc.
 
+### Kotlin Multiplatform SourceSets
+- **Direct sourceSet dependencies**: `commonMain.dependencies { }`
+- **Nested sourceSet blocks**: `commonTest { dependencies { } }`
+- **SourceSet-specific configurations**: `commonMainImplementation`, `androidMainApi`
+- **Configuration mapping**: Dependencies tagged with sourceSet suffix (e.g., `implementation-commonMain`)
+- **All standard sourceSets**: `commonMain`, `commonTest`, `androidMain`, `iosMain`, `jvmMain`, etc.
+
+### Project Dependencies Filtering
+- **Project references**: `project(':module')` automatically excluded from analysis
+- **Projects accessor**: `projects.module.submodule` automatically excluded
+- **Focus on external libraries**: Only analyzes third-party dependencies for duplicates/conflicts
+
 ### Plugin Detection
-- **Plugins block**: `id 'plugin-name' version 'version'`
-- **Apply plugin**: `apply plugin: 'plugin-name'`
+- **Plugins block**: `id("plugin-name") version "version"`
+- **Apply plugin**: `apply(plugin = "plugin-name")`
 - **Version catalog**: `alias(libs.plugins.pluginName)`
-- **Core plugins**: `java`, `kotlin("jvm")`, etc.
+- **Core plugins**: `java`, `kotlin("jvm")`, `kotlin("multiplatform")`, etc.
 
 ### Version Catalog Features
 - **Version references**: `version.ref = "version-key"`
 - **Direct versions**: `version = "1.0.0"`
-- **Bundle detection**: Bundles are treated as individual dependencies
+- **Dot-to-dash conversion**: `libs.kotlinx.coroutines.core` resolves to `kotlinx-coroutines-core`
 - **Plugin catalog**: Full support for plugin version management
+- **BOM support**: Handles dependencies without explicit versions
 
 ## 5. Project Structure Support
 

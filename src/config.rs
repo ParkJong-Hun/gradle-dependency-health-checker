@@ -107,7 +107,13 @@ pub mod regex_patterns {
     pub const STRING_DEPENDENCY: &str = r#"^\s*(\w+)\s*[\(\s]?\s*["']([^"':]+):([^"':]+):([^"']+)["']\s*[\)\s]?.*$"#;
     pub const MAP_DEPENDENCY_1: &str = r#"^\s*(\w+)\s*\(\s*group\s*:\s*["']([^"']+)["']\s*,\s*name\s*:\s*["']([^"']+)["']\s*,\s*version\s*:\s*["']([^"']+)["']\s*\).*$"#;
     pub const MAP_DEPENDENCY_2: &str = r#"^\s*(\w+)\s*\(\s*name\s*:\s*["']([^"']+)["']\s*,\s*group\s*:\s*["']([^"']+)["']\s*,\s*version\s*:\s*["']([^"']+)["']\s*\).*$"#;
-    pub const LIBS_DEPENDENCY: &str = r#"^\s*(\w+)\s+libs\.([a-zA-Z0-9.\-_]+)\s*.*$"#;
+    pub const LIBS_DEPENDENCY: &str = r#"^\s*(\w+)\s*[\(\s]\s*libs\.([a-zA-Z0-9.\-_]+)\s*[\)\s]?.*$"#;
+    pub const VERSION_CATALOG_DEPENDENCY: &str = r#"^\s*(\w+)\s*[\(\s]\s*([a-zA-Z0-9]+)\.([a-zA-Z0-9.\-_]+)\s*[\)\s]?.*$"#;
+    
+    // Project dependency patterns (these should be ignored)
+    pub const PROJECT_DEPENDENCY: &str = r#"^\s*\w+\s*[\(\s]\s*project\s*\(\s*["'][^"']*["']\s*\)\s*[\)\s]?.*$"#;
+    pub const PROJECTS_ACCESSOR_DEPENDENCY: &str = r#"^\s*\w+\s*[\(\s]\s*projects\.([a-zA-Z0-9.\-_]+)\s*[\)\s]?.*$"#;
+    
     pub const DEPENDENCIES_BLOCK: &str = r"dependencies";
     
     // Plugin patterns

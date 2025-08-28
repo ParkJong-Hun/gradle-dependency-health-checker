@@ -1,0 +1,4 @@
+dependencies {
+    implementation "com.google.code.gson:gson:2.10.1"
+    api "io.ktor:ktor-client-core:2.3.5"
+}
