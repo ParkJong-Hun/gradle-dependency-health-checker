@@ -1,6 +1,6 @@
 [package]
 name = "gradle-dependency-health-checker"
-version = "0.4.0"
+version = "0.4.1"
 edition = "2021"
 authors = ["ParkJong-Hun thesn515@gmail.com"]
 description = "A powerful tool to detect duplicate dependencies, version conflicts, duplicate plugins, and recommend dependency bundles in Gradle projects with JSON export capabilities"
