@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2025-08-28
+
+### Added
+- **Loading Animations**: Added visual progress indicators for better user experience
+  - Spinner animation for file writing operations using Unicode characters (⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏)
+  - Progress animation for analysis operations with emoji and dots (🔍 Analyzing...)
+  - Non-blocking animations using separate threads and atomic operations
+  - Automatic disable in silent mode (`--silent` flag)
+- **Kotlin Multiplatform Support**: Enhanced parsing for complex Kotlin DSL configurations
+  - Support for nested `kotlin { sourceSets { ... } }` block structures
+  - Enhanced state machine parser with `InKotlin` state for proper nesting
+  - Support for all sourceSet configurations (commonMain, androidMain, iosMain, etc.)
+- **Version Catalog Integration**: Comprehensive support for Gradle Version Catalogs
+  - Dot-to-dash conversion for library references (`libs.kotlinx.coroutines.core` → `kotlinx-coroutines-core`)
+  - Support for Compose BOM accessors (`compose.runtime`, `compose.ui`)
+  - Enhanced TOML parsing with fallback resolution strategies
+- **Project Dependency Filtering**: Added intelligent filtering to focus on external libraries
+  - Exclude `project(':module')` style dependencies from analysis
+  - Exclude `projects.xxx` accessor-based project dependencies
+  - Configurable patterns for different project reference styles
+
+### Enhanced
+- **Parser Robustness**: Significantly improved parsing accuracy for real-world projects
+  - Better handling of complex nested block structures
+  - Enhanced regex patterns for various dependency declaration styles
+  - Improved state machine transitions with proper ownership handling
+- **Terminal Integration**: Better terminal control with cursor management
+  - Proper cleanup of loading animations on completion
+  - Smooth animation transitions without screen flicker
+- **Error Handling**: Enhanced error reporting for parsing edge cases
+- **Performance**: Optimized parsing for large multi-module projects
+
+### Technical Improvements
+- **New Module**: Created `src/loading.rs` with `LoadingSpinner` and `ProgressBar` structs
+- **State Machine**: Enhanced parser state machine with additional states for nested blocks
+- **Configuration**: Extended regex patterns in `src/config.rs` for better matching
+- **Version Resolution**: Improved version catalog resolution logic in `src/version_catalog.rs`
+
 ## [0.3.0] - 2025-08-27
 
 ### Added
