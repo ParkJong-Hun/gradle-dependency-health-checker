@@ -1,0 +1,105 @@
+{
+  "duplicate_analysis": {
+    "regular_duplicates": {
+      "io.ktor:ktor-client-core": [
+        {
+          "dependency": {
+            "group": "io.ktor",
+            "artifact": "ktor-client-core",
+            "version": "2.3.5"
+          },
+          "file_path": "test-samples/version-conflicts/app/build.gradle",
+          "line_number": 3,
+          "configuration": "api",
+          "source_type": "Direct"
+        },
+        {
+          "dependency": {
+            "group": "io.ktor",
+            "artifact": "ktor-client-core",
+            "version": "2.3.5"
+          },
+          "file_path": "test-samples/version-conflicts/lib/build.gradle",
+          "line_number": 3,
+          "configuration": "api",
+          "source_type": "Direct"
+        }
+      ]
+    },
+    "version_conflicts": {
+      "com.google.code.gson:gson": [
+        {
+          "dependency": {
+            "group": "com.google.code.gson",
+            "artifact": "gson",
+            "version": "2.10.1"
+          },
+          "file_path": "test-samples/version-conflicts/app/build.gradle",
+          "line_number": 2,
+          "configuration": "implementation",
+          "source_type": "Direct"
+        },
+        {
+          "dependency": {
+            "group": "com.google.code.gson",
+            "artifact": "gson",
+            "version": "2.8.9"
+          },
+          "file_path": "test-samples/version-conflicts/lib/build.gradle",
+          "line_number": 2,
+          "configuration": "implementation",
+          "source_type": "Direct"
+        }
+      ],
+      "androidx.core:core-ktx": [
+        {
+          "dependency": {
+            "group": "androidx.core",
+            "artifact": "core-ktx",
+            "version": "1.13.0"
+          },
+          "file_path": "test-samples/version-conflicts/core/build.gradle",
+          "line_number": 2,
+          "configuration": "implementation",
+          "source_type": "Direct"
+        },
+        {
+          "dependency": {
+            "group": "androidx.core",
+            "artifact": "core-ktx",
+            "version": "1.12.0"
+          },
+          "file_path": "test-samples/version-conflicts/lib/build.gradle",
+          "line_number": 4,
+          "configuration": "implementation",
+          "source_type": "Direct"
+        }
+      ]
+    }
+  },
+  "plugin_analysis": {
+    "duplicate_plugins": {}
+  },
+  "bundle_analysis": {
+    "recommended_bundles": [
+      {
+        "dependencies": [
+          "com.google.code.gson:gson",
+          "io.ktor:ktor-client-core"
+        ],
+        "modules": [
+          "test-samples/version-conflicts/app/build.gradle",
+          "test-samples/version-conflicts/lib/build.gradle"
+        ],
+        "bundle_size": 2,
+        "module_count": 2,
+        "configurations": [
+          "api",
+          "implementation"
+        ],
+        "priority_score": 35.5
+      }
+    ],
+    "total_bundles_found": 1
+  }
+}

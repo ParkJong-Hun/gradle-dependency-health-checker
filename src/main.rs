@@ -13,6 +13,7 @@ mod version_catalog;
 mod bundle_analyzer;
 mod config;
 mod error;
+mod loading;
 
 use clap::Parser;
 use colored::*;
@@ -20,6 +21,7 @@ use cli::{Args, validate_args, AnalysisOptions};
 use config::Config;
 use analyzer::{perform_complete_analysis, CompleteAnalysis};
 use display::{print_version_conflicts, print_regular_duplicates, print_bundle_recommendations, print_duplicate_plugins};
+use loading::{ProgressBar, LoadingSpinner};
 use std::fs;
 use std::io::Write;
 
@@ -37,18 +39,40 @@ fn main() {
     
     let options = args.get_analysis_options(&config);
     
-    match perform_complete_analysis(&args.path, options.min_bundle_size, options.min_bundle_modules) {
+    // Only show loading animation if not in silent mode
+    let analysis_result = if args.silent {
+        perform_complete_analysis(&args.path, options.min_bundle_size, options.min_bundle_modules)
+    } else {
+        let mut progress = ProgressBar::new("Analyzing Gradle project dependencies");
+        let result = perform_complete_analysis(&args.path, options.min_bundle_size, options.min_bundle_modules);
+        match &result {
+            Ok(_) => progress.finish_with_message("✅ Analysis completed successfully"),
+            Err(_) => progress.finish(),
+        }
+        result
+    };
+    
+    match analysis_result {
         Ok(analysis) => {
             // Handle output based on whether file output is requested
             if let Some(output_path) = &args.output {
-                if let Err(e) = write_analysis_to_file(&analysis, output_path) {
+                let write_result = if args.silent {
+                    write_analysis_to_file(&analysis, output_path)
+                } else {
+                    let mut spinner = LoadingSpinner::new("Writing results to file");
+                    let result = write_analysis_to_file(&analysis, output_path);
+                    match &result {
+                        Ok(_) => spinner.finish_with_message(&format!("✅ Analysis results written to: {}", output_path.display())),
+                        Err(_) => spinner.finish(),
+                    }
+                    result
+                };
+                
+                if let Err(e) = write_result {
                     if !args.silent {
                         eprintln!("❌ Error writing to file: {}", e);
                     }
                     std::process::exit(1);
-                }
-                if !args.silent {
-                    println!("✅ Analysis results written to: {}", output_path.display());
                 }
             } else {
                 // In silent mode without output file, don't print anything
